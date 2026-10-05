@@ -1,0 +1,222 @@
+// corportal infra pipeline (multibranch job corportal/infra): Terraform behind the owner's approval, the
+// in-cluster platform, the database, the full chart deploy and the Databricks bundle, for one
+// environment. Images are built by the five service pipelines (ci/Jenkinsfile.service).
+//
+// Branch -> environment: main -> prod (Front Door, optional region 2), develop -> dev (westus2,
+// Kong's public IP over HTTPS). Any other branch: tests and Checkov only, nothing is deployed.
+//
+// Identity (P-3): the VM agent signs in as its managed identity id-corportal-jenkins
+// (az login --identity, ARM_USE_MSI for Terraform). No stored keys or registry passwords.
+// Node environment of `corportal-vm` (from infra/bootstrap output `jenkins_env`): ARM_CLIENT_ID,
+// ARM_SUBSCRIPTION_ID, ARM_TENANT_ID, TF_VAR_aks_admin_group_object_ids, optional JENKINS_PUBLIC_IP.
+
+def environmentFor(String branch) {
+  return [main: 'prod', develop: 'dev'][branch] ?: 'none'
+}
+
+def deploys() {
+  return env.ENVIRONMENT in ['dev', 'prod']
+}
+
+pipeline {
+  agent none
+
+  options {
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '30'))
+    timeout(time: 6, unit: 'HOURS')
+  }
+
+  parameters {
+    booleanParam(name: 'REGION_SECONDARY_ENABLED', defaultValue: false,
+      description: 'prod only (demo day): add the region 2 stack (North Central US AKS, second Front Door origin) and deploy there too.')
+    booleanParam(name: 'DESTROY', defaultValue: false,
+      description: 'terraform plan -destroy, then owner approval, then destroy (P-9). No deploy.')
+    booleanParam(name: 'DEMO_MODE', defaultValue: false,
+      description: 'Demo: Databricks batch cadence 30 s, and the services move off spot nodes onto regular nodes.')
+  }
+
+  environment {
+    REGISTRY   = 'exampleacr.azurecr.io'
+    IMAGE_REPO = 'exampleacr.azurecr.io/corportal'
+    TF_DIR     = 'infra/main'
+    ARM_USE_MSI = 'true'
+  }
+
+  stages {
+    stage('Prepare') {
+      agent { label 'corportal-vm' }
+      steps {
+        script {
+          env.ENVIRONMENT = environmentFor(env.BRANCH_NAME)
+          // The database Job runs the accounts-api image of this environment (<service>:<env>).
+          env.IMAGE_TAG = env.ENVIRONMENT
+          if (env.ENVIRONMENT == 'dev' && params.REGION_SECONDARY_ENABLED) {
+            error('dev is one region: REGION_SECONDARY_ENABLED is prod only')
+          }
+          currentBuild.description = deploys() ? "${env.ENVIRONMENT}${params.DESTROY ? ' DESTROY' : ''}" : 'checks only'
+        }
+        echo "Branch ${env.BRANCH_NAME} -> environment ${env.ENVIRONMENT}; secondary region ${params.REGION_SECONDARY_ENABLED}; destroy ${params.DESTROY}; demo ${params.DEMO_MODE}"
+      }
+    }
+
+    stage('Tests') {
+      when { expression { !params.DESTROY } }
+      agent { label 'corportal-vm' }
+      steps {
+        sh 'mkdir -p .work && uv sync --frozen && uv run pytest -q'   // .work/: pytest --basetemp (gitignored)
+      }
+    }
+
+    stage('Checkov') {
+      // IaC scan of infra/ (6c). Soft fail: the IaC is a PoC; findings are reported and archived.
+      when { expression { !params.DESTROY } }
+      agent { label 'corportal-vm' }
+      steps {
+        sh '''
+          mkdir -p reports
+          uvx checkov -d infra --framework terraform --soft-fail --compact \
+            -o cli -o junitxml --output-file-path console,reports/checkov.xml
+        '''
+      }
+      post {
+        always { archiveArtifacts artifacts: 'reports/checkov.xml', allowEmptyArchive: true }
+      }
+    }
+
+    stage('Terraform plan') {
+      when { expression { deploys() } }
+      agent { label 'corportal-vm' }
+      environment {
+        DESTROY = "${params.DESTROY}"
+        REGION_SECONDARY_ENABLED = "${params.REGION_SECONDARY_ENABLED}"
+      }
+      steps {
+        sh 'ci/scripts/terraform.sh plan'
+        stash name: 'tfplan', includes: 'infra/main/tfplan'
+        script {
+          env.PLAN_SUMMARY = readFile('reports/tfplan-summary.txt').trim()
+        }
+      }
+      post {
+        always { archiveArtifacts artifacts: 'reports/tfplan*.txt', allowEmptyArchive: true }
+      }
+    }
+
+    stage('Approve') {
+      // 6b: the owner approves every terraform apply (and destroy). No executor is held while waiting.
+      when { expression { deploys() } }
+      steps {
+        script {
+          def action = params.DESTROY ? "DESTROY every corportal ${env.ENVIRONMENT} resource" : "apply to ${env.ENVIRONMENT}"
+          try {
+            timeout(time: 4, unit: 'HOURS') {
+              input(message: "Terraform ${action}?\n\n${env.PLAN_SUMMARY}\n\nFull plan: tfplan.txt in this build's artifacts.",
+                    ok: params.DESTROY ? 'Destroy' : 'Apply', submitter: 'approver')
+            }
+          } catch (err) {
+            error("Terraform ${action} was not approved by approver (refused or timed out). Nothing was changed.")
+          }
+        }
+      }
+    }
+
+    stage('Terraform apply') {
+      when { expression { deploys() } }
+      agent { label 'corportal-vm' }
+      environment {
+        DESTROY = "${params.DESTROY}"
+      }
+      steps {
+        unstash 'tfplan'
+        sh 'ci/scripts/terraform.sh apply'
+        script {
+          if (!params.DESTROY) {
+            stash name: 'tf-outputs', includes: 'reports/tf-outputs.json'
+          }
+        }
+      }
+    }
+
+    stage('Cluster access') {
+      // The clusters now exist: kubeconfigs and the Helm values from Terraform.
+      when { expression { deploys() && !params.DESTROY } }
+      agent { label 'corportal-vm' }
+      steps {
+        unstash 'tf-outputs'
+        sh 'ci/scripts/cluster-access.sh reports/tf-outputs.json'
+        stash name: 'release-inputs', includes: 'reports/tf-outputs.json,reports/aks-clusters.txt,reports/values-tf-*.yaml'
+      }
+    }
+
+    stage('Platform add-ons') {
+      // Still on the VM: Key Vault's firewall admits only this VM's public IP. Installs, per
+      // region (pinned in deploy/platform/versions.env): Kong OSS (prod: the Front Door catch-all;
+      // dev: HTTPS with cert-manager + Let's Encrypt), HashiCorp Vault (Key Vault auto-unseal,
+      // injector, Kubernetes auth, init once, P-3) and Prometheus (prod: its API through Kong, key
+      // from the corportal folder credential corportal-prometheus-api-key). Re-runs are no-ops.
+      when { expression { deploys() && !params.DESTROY } }
+      agent { label 'corportal-vm' }
+      steps {
+        unstash 'release-inputs'
+        script {
+          if (env.ENVIRONMENT == 'prod') {
+            withCredentials([string(credentialsId: 'corportal-prometheus-api-key', variable: 'PROMETHEUS_API_KEY')]) {
+              sh 'ci/scripts/platform-addons.sh reports/tf-outputs.json'
+            }
+          } else {
+            sh 'ci/scripts/platform-addons.sh reports/tf-outputs.json'
+          }
+        }
+      }
+    }
+
+    stage('Release') {
+      when {
+        beforeAgent true
+        expression { deploys() && !params.DESTROY }
+      }
+      agent { label 'corportal-vm' }
+      stages {
+        stage('Sign in') {
+          steps {
+            unstash 'release-inputs'
+            sh 'ci/scripts/vm-tools.sh && ci/scripts/release-auth.sh reports/aks-clusters.txt'
+          }
+        }
+        stage('Image tags') {
+          // <service>:<env> for every image (seeded from :latest until its service pipeline ran).
+          steps {
+            sh 'ci/scripts/ensure-env-tags.sh'
+          }
+        }
+        stage('Database') {
+          // Schema, data, RLS and SQL users, once per run (keeps existing data). Primary only:
+          // the secondary SQL server is the failover replica.
+          steps {
+            sh 'ci/scripts/db-init.sh reports/tf-outputs.json'
+          }
+        }
+        stage('Helm primary') {
+          steps {
+            sh "DEMO_MODE=${params.DEMO_MODE} ci/scripts/helm-deploy.sh primary"
+          }
+        }
+        stage('Helm secondary') {
+          when { expression { params.REGION_SECONDARY_ENABLED } }
+          steps {
+            sh "DEMO_MODE=${params.DEMO_MODE} ci/scripts/helm-deploy.sh secondary"
+          }
+        }
+        stage('Databricks bundle') {
+          steps {
+            sh "DEMO_MODE=${params.DEMO_MODE} ci/scripts/bundle-deploy.sh reports/tf-outputs.json"
+          }
+        }
+      }
+      post {
+        always { sh 'rm -rf .tokens' }
+      }
+    }
+  }
+}

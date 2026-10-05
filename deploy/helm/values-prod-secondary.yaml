@@ -1,0 +1,10 @@
+# Region 2 (North Central US, demo day only, P-9 / P-11). Same chart, same images.
+global:
+  region: northcentralus
+  entra:
+    tenantId: ""
+    audience: ""
+    spaClientId: ""
+    authority: ""
+    knownAuthority: ""
+    apiScope: ""

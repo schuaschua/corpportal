@@ -1,0 +1,51 @@
+# prod only (applied by ci/scripts/platform-addons.sh when Terraform has a Front Door, P-7):
+# anything without our X-Azure-FDID lands on this catch-all route and is refused with 403.
+# Kong's router always prefers a route with a header match over this header-less one.
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: fdid-deny
+  annotations:
+    kubernetes.io/ingress.class: kong
+plugin: request-termination
+config:
+  status_code: 403
+  message: "Forbidden: requests must come through the corportal Front Door"
+
+# No endpoints on purpose: request-termination answers before Kong would proxy.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fdid-deny
+  labels:
+    app.kubernetes.io/part-of: corportal
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fdid-deny
+  labels:
+    app.kubernetes.io/part-of: corportal
+  annotations:
+    konghq.com/plugins: fdid-deny
+    konghq.com/protocols: "http,https"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: fdid-deny
+                port:
+                  name: http

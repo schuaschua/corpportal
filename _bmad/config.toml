@@ -1,0 +1,53 @@
+# ─────────────────────────────────────────────────────────────────
+# Installer-managed. Regenerated on every install — treat as read-only.
+#
+# Direct edits to this file will be overwritten on the next install.
+# To change an install answer durably, re-run the installer (your prior
+# answers are remembered as defaults). To pin a value regardless of
+# install answers, or to add custom agents / override descriptors, use:
+#   _bmad/custom/config.toml       (team, committed)
+#   _bmad/custom/config.user.toml  (personal, gitignored)
+# Those files are never touched by the installer.
+# ─────────────────────────────────────────────────────────────────
+
+[core]
+project_name = "corportal"
+document_output_language = "English"
+output_folder = "{project-root}/_bmad-output"
+
+[modules.org]
+jira_site = "https://example.atlassian.net/"
+jira_project_key = "PORTAL"
+confluence_wiki_url = ""
+governance_folder = "{project-root}/docs/governance"
+standards_folder = "{project-root}/docs/standards"
+token_usage_folder = "{project-root}/docs/costing/token_usage"
+cost_estimates_folder = "{project-root}/docs/costing"
+architecture_folder = "{project-root}/docs/architecture"
+diagrams_folder = "{project-root}/docs/architecture/diagrams"
+design_docs_folder = "{project-root}/docs/architecture/design"
+region = "uae"
+
+[agents.agent-jules]
+module = "org"
+team = "org"
+name = "Jules"
+title = "IT Governance"
+icon = "🛡️"
+description = "Drafts, coaches and routes IT governance questionnaire answers (Technical Architecture, Data Governance & Privacy and Enterprise AI Risk Assessments) for the Product Lead and Tech Lead from the project's BMad artifacts, with a 2-hourly reviewer-comment watch."
+
+[agents.agent-davinci]
+module = "org"
+team = "org"
+name = "Da Vinci"
+title = "Architecture Principles, Diagrams and Design Documents"
+icon = "🎨"
+description = "Agrees the architecture principles and guardrails with the user before bmad-architecture (docs/architecture/architecture.md, plus one file per cloud provider), then draws cited draw.io diagrams and writes cited HLD/LLD Word documents from the spine."
+
+[agents.agent-scrooge]
+module = "org"
+team = "org"
+name = "Scrooge McDuck"
+title = "Token Usage Accountant and Cost Estimator"
+icon = "💰"
+description = "Keeps the project's token ledger from its Claude Code logs and suggests how to spend fewer tokens; prices the solution from its BMad artifacts into an Excel cost estimate with a sheet per environment, a rate card and team mandays."

@@ -1,0 +1,153 @@
+# Defaults for every region. Per environment and region: deploy/helm/values-<env>-<region>.yaml
+# (dev-primary, prod-primary, prod-secondary). services.<name>.imageTag overrides global.imageTag
+# (the per-service pipelines deploy one service at a time).
+# Jenkins adds a third file generated from `terraform output` (ci/scripts/tf_outputs.py:
+# region, Front Door ID, Event Hubs namespace, Istio revision, workload identity client IDs)
+# and --set global.imageTag=<git short SHA> --set global.spot=<not DEMO_MODE>.
+
+global:
+  registry: exampleacr.azurecr.io
+  imagePrefix: corportal          # images are <registry>/<imagePrefix>/<service>:<imageTag>
+  imageTag: latest
+  imagePullPolicy: IfNotPresent   # AKS kubelet identity has AcrPull on the registry
+  region: local                   # REGION env (the portal's "Serving from" badge)
+  # X-Azure-FDID of our Front Door (prod, P-7): Kong routes only requests carrying it. Empty =
+  # no Front Door (dev), which then requires ingress.tls (users reach Kong directly over HTTPS).
+  frontDoorId: ""
+  # Spot capacity through Karpenter (node auto-provisioning) during development.
+  # DEMO_MODE sets false: pods move to regular on-demand nodes.
+  spot: true
+  eventHubsNamespace: ""          # <ns>.servicebus.windows.net (outbox-relay)
+  entra:                          # Entra External ID, non-secret identifiers only
+    tenantId: ""
+    audience: ""                  # API app ID URI / client ID the APIs accept
+    issuer: ""                    # optional; default login.microsoftonline.com/<tenant>/v2.0
+    spaClientId: ""
+    authority: ""
+    knownAuthority: ""
+    apiScope: ""
+
+istio:
+  # Managed Istio add-on revision (for example asm-1-29); empty = only the generic label.
+  revision: ""
+  mtlsStrict: true                # PeerAuthentication STRICT for the release namespace
+
+vault:
+  # Vault Agent injector (P-3): each service with `vault: true` gets its secrets rendered to
+  # /vault/secrets/env as `export KEY='value'` lines from <secretPathPrefix>/<service>
+  # (KV v2), sourced before the process starts. Vault role = service name.
+  secretPathPrefix: secret/data/corportal
+  authPath: auth/kubernetes
+
+ingress:
+  className: kong
+  host: ""                        # empty = any host (Front Door sends its origin host header)
+  # dev: Kong's DNS name over HTTPS, a Let's Encrypt certificate from cert-manager (one
+  # Certificate for every route; ClusterIssuer from ci/scripts/platform-addons.sh).
+  tls:
+    enabled: false
+    clusterIssuer: letsencrypt
+    secretName: corportal-tls
+
+karpenter:
+  nodeClass: default              # AKSNodeClass created by node auto-provisioning
+  spotCpuLimit: "16"              # cap for the spot NodePool (cost ceiling, P-9)
+
+# Pod anti-affinity is deliberately off: one replica per service, packed onto one D4s node
+# plus whatever Karpenter adds.
+affinity: {}
+
+services:
+  accounts-api:
+    enabled: true
+    replicas: 1
+    port: 8000
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+    probePath: /healthz
+    ingressPath: /api/accounts/
+    stripPath: true
+    vault: true                   # DB_URL
+    entra: api
+    workloadIdentityClientId: ""
+    env:
+      AUTH_MODE: entra
+    securityContext: &pythonSecurity
+      runAsNonRoot: true
+      runAsUser: 10001
+      allowPrivilegeEscalation: false
+      capabilities: {drop: ["ALL"]}
+    resources: &apiResources
+      requests: {cpu: 100m, memory: 256Mi}
+      limits: {memory: 512Mi}
+
+  payments-api:
+    enabled: true
+    replicas: 1
+    port: 8000
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+    probePath: /healthz
+    ingressPath: /api/payments/
+    stripPath: true
+    vault: true
+    entra: api
+    workloadIdentityClientId: ""
+    env:
+      AUTH_MODE: entra
+    securityContext: *pythonSecurity
+    resources: *apiResources
+
+  insights-api:
+    enabled: true
+    replicas: 1
+    port: 8000
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+    probePath: /healthz
+    ingressPath: /api/insights/
+    stripPath: true
+    vault: true
+    entra: api
+    workloadIdentityClientId: ""
+    env:
+      AUTH_MODE: entra
+    securityContext: *pythonSecurity
+    resources: *apiResources
+
+  outbox-relay:
+    enabled: true
+    replicas: 1                   # one relay only: it publishes in outbox id order
+    port: null                    # a worker: no Service, no Ingress
+    command: ["python", "app.py"]
+    probePath: null               # no HTTP endpoint; Kubernetes restarts it if the process exits
+    vault: true                   # DB_URL
+    entra: null
+    workloadIdentityClientId: ""  # Azure Event Hubs Data Sender (DefaultAzureCredential)
+    env:
+      RELAY_SINK: eventhubs
+      EVENTHUB_NAME: portal-events
+    securityContext: *pythonSecurity
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {memory: 256Mi}
+
+  portal-web:
+    enabled: true
+    replicas: 1
+    port: 8080
+    command: null                 # nginx image entrypoint writes /config.js at start
+    probePath: /healthz           # SPA fallback answers 200 with index.html
+    ingressPath: /
+    stripPath: false
+    vault: false                  # public SPA config only
+    entra: spa
+    workloadIdentityClientId: ""
+    env:
+      ACCOUNTS_API_URL: http://accounts-api:8000
+      PAYMENTS_API_URL: http://payments-api:8000
+      INSIGHTS_API_URL: http://insights-api:8000
+      VITE_AUTH_MODE: entra
+      VITE_LINEAGE_URL: ""
+    securityContext:              # nginx's entrypoint renders its config as root
+      allowPrivilegeEscalation: false
+    resources:
+      requests: {cpu: 50m, memory: 64Mi}
+      limits: {memory: 128Mi}

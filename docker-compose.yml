@@ -1,0 +1,156 @@
+# Local stack: SQL Server 2022 + db-init (schema, synthetic data, RLS) + the three APIs + the
+# portal, plus the event flow: outbox-relay (files sink) -> shared `lake` volume -> pipelines
+# (local PySpark + Delta medallion, one batch every BATCH_CADENCE_SECONDS) -> serving.cash_position,
+# and the ML: pipelines backfills the seeded history and trains once at start-up (MLflow file
+# store in the `lake` volume), then scores every batch -> serving.forecast / serving.anomalies,
+# which insights-api serves.
+#   cp .env.example .env && docker compose up -d --build
+#   open http://localhost:8088   (portal; sign in as Priya, Tom or Omar)
+#   curl -si -H 'X-Demo-User: priya' localhost:8001/dashboard
+
+x-db-url: &db_url "mssql+pyodbc://sa:${MSSQL_SA_PASSWORD:?copy .env.example to .env}@sqlserver:1433/corportal?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+# The lake pipeline connects as pipeline_writer (a member of the RLS-exempt role), never as sa.
+x-pipeline-db-url: &pipeline_db_url "mssql+pyodbc://pipeline_writer:${PIPELINE_WRITER_PASSWORD:-ChangeMePipeline123}@sqlserver:1433/corportal?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?copy .env.example to .env}
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqldata:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -b -Q 'SELECT 1' > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+
+  db-init:
+    build:
+      context: .
+      dockerfile: services/accounts-api/Dockerfile
+    image: corportal/accounts-api:local
+    command: ["python", "db/init_db.py"]
+    environment:
+      DB_URL: *db_url
+      SEED: ${SEED:-42}
+      AS_OF: ${AS_OF:-}
+      RESEED: ${RESEED:-0}
+      PIPELINE_WRITER_PASSWORD: ${PIPELINE_WRITER_PASSWORD:-ChangeMePipeline123}
+    volumes:
+      - ./db:/app/db:ro
+      - ./data:/app/data:ro
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    restart: "no"
+
+  accounts-api:
+    build:
+      context: .
+      dockerfile: services/accounts-api/Dockerfile
+    image: corportal/accounts-api:local
+    environment:
+      DB_URL: *db_url
+      AUTH_MODE: dev
+      REGION: ${REGION:-local}
+    ports:
+      - "8001:8000"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  payments-api:
+    build:
+      context: .
+      dockerfile: services/payments-api/Dockerfile
+    image: corportal/payments-api:local
+    environment:
+      DB_URL: *db_url
+      AUTH_MODE: dev
+      REGION: ${REGION:-local}
+    ports:
+      - "8002:8000"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  insights-api:
+    build:
+      context: .
+      dockerfile: services/insights-api/Dockerfile
+    image: corportal/insights-api:local
+    environment:
+      DB_URL: *db_url
+      AUTH_MODE: dev
+      REGION: ${REGION:-local}
+    ports:
+      - "8003:8000"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  outbox-relay:
+    build:
+      context: .
+      dockerfile: services/outbox-relay/Dockerfile
+    image: corportal/outbox-relay:local
+    environment:
+      DB_URL: *db_url
+      RELAY_SINK: files          # Azure: eventhubs (EVENTHUB_NAMESPACE + workload identity)
+      LANDING_DIR: /lake/landing
+      RELAY_POLL_SECONDS: "5"
+    volumes:
+      - lake:/lake
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  pipelines:
+    cpus: "1.5"          # cap Spark locally; the Mac stays usable
+    build:
+      context: .
+      dockerfile: databricks/Dockerfile.local
+    image: corportal/pipelines:local
+    environment:
+      SERVING_DB_URL: *pipeline_db_url
+      BRONZE_SOURCE: files       # Databricks: kafka (Event Hubs Kafka endpoint)
+      LANDING_DIR: /lake/landing
+      LAKE_DIR: /lake/delta
+      BATCH_CADENCE_SECONDS: ${BATCH_CADENCE_SECONDS:-120}
+      AS_OF: ${AS_OF:-}
+      MLFLOW_TRACKING_URI: file:///lake/mlruns   # Databricks: the workspace + Unity Catalog
+      ML_SEED: ${SEED:-42}
+    volumes:
+      - lake:/lake
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  portal-web:
+    build:
+      context: ./web
+    image: corportal/portal-web:local
+    environment:
+      # Same-origin proxy to the APIs (nginx), and the SPA's runtime config (/config.js).
+      ACCOUNTS_API_URL: http://accounts-api:8000
+      PAYMENTS_API_URL: http://payments-api:8000
+      INSIGHTS_API_URL: http://insights-api:8000
+      VITE_AUTH_MODE: dev
+      VITE_LINEAGE_URL: ${LINEAGE_URL:-}
+    ports:
+      - "8088:8080"
+    depends_on:
+      - accounts-api
+      - payments-api
+      - insights-api
+
+volumes:
+  sqldata:
+  lake:

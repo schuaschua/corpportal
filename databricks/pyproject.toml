@@ -1,0 +1,24 @@
+[project]
+name = "corp-pipelines"
+version = "0.1.0"
+description = "Corporate Portal PoC lake pipelines: bronze, silver, gold, ML (train, score), serving (Databricks Asset Bundle wheel)"
+requires-python = ">=3.11"
+# pyspark, delta-spark and databricks-sdk come with the Databricks runtime (and with
+# Dockerfile.local locally). scikit-learn, pandas and MLflow also ship with Databricks
+# Runtime 15.4 LTS; the lower bounds below are what it has, so pip installs nothing extra there.
+dependencies = [
+    "azure-identity>=1.19",
+    "scikit-learn>=1.3",
+    "pandas>=1.5",
+    "mlflow-skinny>=2.11",
+]
+
+[project.scripts]
+corp-pipelines = "corp_pipelines.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/corp_pipelines"]

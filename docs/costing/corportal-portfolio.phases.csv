@@ -1,0 +1,9 @@
+estimate,currency,phase,api_budget,api_actual,variance,variance_pct
+corportal-portfolio,USD,brainstorming,15,16.36,1.36,0.0907
+corportal-portfolio,USD,spec,30,33.61,3.61,0.1203
+corportal-portfolio,USD,architecture,55,60.18,5.18,0.0942
+corportal-portfolio,USD,UX design,45,49.31,4.31,0.0958
+corportal-portfolio,USD,governance (Jules),20,23.28,3.28,0.1638
+corportal-portfolio,USD,architecture docs (Da Vinci),25,25.42,0.42,0.0168
+corportal-portfolio,USD,epics & stories,35,38.53,3.53,0.1009
+corportal-portfolio,USD,"merges, promotions & deploys",30,15.38,-14.62,-0.4872

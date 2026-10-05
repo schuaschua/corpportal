@@ -1,0 +1,121 @@
+// corportal service pipeline, shared by the five multibranch jobs corportal/<service>
+// (accounts-api, payments-api, insights-api, outbox-relay, portal-web): the service comes from
+// the job's name. Tests, an ACR Tasks image build and the Trivy gate; on develop/main also the
+// environment's moving tag (<service>:dev / :prod) and a rolling deploy of this one service.
+//
+// Branch -> environment: main -> prod, develop -> dev, any other branch: build and scan only.
+// A build only does work when its service's files changed since the last successful build (or
+// when started by hand); otherwise it ends early as NOT_BUILT.
+
+def environmentFor(String branch) {
+  return [main: 'prod', develop: 'dev'][branch] ?: 'none'
+}
+
+// Files each image is built from (the Dockerfiles' COPY lines).
+def pathsFor(String service) {
+  def python = ['services/common/', 'pyproject.toml', 'uv.lock', "services/${service}/"]
+  return [
+    'accounts-api': python + ['db/', 'data/generator/'],   // also the db-init Job's image
+    'payments-api': python,
+    'insights-api': python,
+    'outbox-relay': python,
+    'portal-web'  : ['web/'],
+  ][service]
+}
+
+def deploys() {
+  return env.ENVIRONMENT in ['dev', 'prod']
+}
+
+pipeline {
+  agent { label 'corportal-vm' }
+
+  options {
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+    timeout(time: 1, unit: 'HOURS')
+  }
+
+  environment {
+    REGISTRY   = 'exampleacr.azurecr.io'
+    IMAGE_REPO = 'exampleacr.azurecr.io/corportal'
+    ARM_USE_MSI = 'true'
+  }
+
+  stages {
+    stage('Prepare') {
+      steps {
+        script {
+          env.SERVICE = env.JOB_NAME.tokenize('/')[-2]
+          def paths = pathsFor(env.SERVICE)
+          if (paths == null) {
+            error("Unknown service '${env.SERVICE}' (job ${env.JOB_NAME})")
+          }
+          env.ENVIRONMENT = environmentFor(env.BRANCH_NAME)
+          env.IMAGE_TAG = sh(returnStdout: true, script: 'git rev-parse --short=7 HEAD').trim()
+
+          def manual = currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause')
+          def since = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT
+          def changed = true
+          if (!manual && since) {
+            def files = sh(returnStdout: true, script: "git diff --name-only ${since} HEAD").trim()
+            changed = files.readLines().any { f -> paths.any { p -> f == p || f.startsWith(p) } }
+          }
+          env.CHANGED = "${changed}"
+          currentBuild.description = changed ? "${env.SERVICE} ${env.IMAGE_TAG} -> ${env.ENVIRONMENT}" : 'no changes'
+          if (!changed) {
+            currentBuild.result = 'NOT_BUILT'
+          }
+        }
+        echo "${env.SERVICE}: branch ${env.BRANCH_NAME} -> environment ${env.ENVIRONMENT}; image ${env.IMAGE_TAG}; changed ${env.CHANGED}"
+      }
+    }
+
+    stage('Tests') {
+      when { expression { env.CHANGED == 'true' && env.SERVICE != 'portal-web' } }
+      steps {
+        // The whole Python suite: fast, and the services share corp_common. portal-web's
+        // TypeScript is type-checked by `npm run build` inside its image build.
+        sh 'mkdir -p .work && uv sync --frozen && uv run pytest -q'   // .work/: pytest --basetemp (gitignored)
+      }
+    }
+
+    stage('Image') {
+      when { expression { env.CHANGED == 'true' } }
+      steps {
+        sh 'ci/scripts/vm-tools.sh'
+        sh 'ci/scripts/image-build.sh "$SERVICE"'
+        sh 'ci/scripts/trivy-scan.sh "$SERVICE"'
+      }
+      post {
+        always { archiveArtifacts artifacts: 'reports/trivy-*.txt', allowEmptyArchive: true }
+        failure { echo "Image ${env.SERVICE} failed to build or failed the Trivy gate (fixed CRITICAL vulnerabilities)." }
+      }
+    }
+
+    stage('Publish') {
+      // <service>:<env> now names this build's image: the infra pipeline deploys <env> tags.
+      when { expression { env.CHANGED == 'true' && deploys() } }
+      steps {
+        sh 'ci/scripts/image-publish.sh "$SERVICE"'
+      }
+    }
+
+    stage('Deploy') {
+      // A rolling update of this one service in every region of the environment. Skipped while
+      // the environment is not provisioned (the infra pipeline deploys everything then).
+      when { expression { env.CHANGED == 'true' && deploys() } }
+      steps {
+        sh '''
+          ci/scripts/terraform.sh output
+          if python3 -c "import json,sys; sys.exit(0 if json.load(open('reports/tf-outputs.json')).get('aks_clusters') else 1)"; then
+            ci/scripts/cluster-access.sh reports/tf-outputs.json
+            ci/scripts/helm-service.sh "$SERVICE" reports/aks-clusters.txt
+          else
+            echo "$ENVIRONMENT is not provisioned: run the infra pipeline (corportal/infra)"
+          fi
+        '''
+      }
+    }
+  }
+}

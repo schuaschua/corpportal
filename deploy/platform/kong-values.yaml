@@ -1,0 +1,74 @@
+# Kong OSS, DB-less, with the Kong Ingress Controller (chart kong/kong, versions.env).
+# Installed per region by ci/scripts/platform-addons.sh, which adds from Terraform:
+#   proxy.annotations: the static public IP (kong_public_ips) and its resource group
+#   podLabels.istio.io/rev: the managed Istio revision (Kong joins the mesh, mTLS STRICT)
+#
+# P-7 (prod, Front Door only): every corportal Ingress matches only when X-Azure-FDID is our Front
+# Door's ID (konghq.com/headers.x-azure-fdid). Any other request falls through to the catch-all
+# route in kong-fdid-deny.yaml (applied only with a Front Door), which answers 403. Kong's router always prefers a
+# route with a header match over the header-less catch-all.
+# Token validation stays in the services (corp_common.auth): Kong OSS has no OIDC plugin
+# (README, "Platform add-ons", deviation from stack.md).
+
+image:
+  repository: kong            # OSS image, never kong/kong-gateway (Enterprise)
+
+env:
+  database: "off"
+  router_flavor: traditional
+  nginx_worker_processes: "1"
+  # Front Door sends the client address in X-Forwarded-For. Callers that bypass Front Door
+  # only reach the 403 route, so trusting the header costs nothing (rate-limiting by client).
+  real_ip_header: X-Forwarded-For
+  real_ip_recursive: "on"
+  trusted_ips: 0.0.0.0/0,::/0
+
+admin:
+  enabled: false
+manager:
+  enabled: false              # no Kong Manager GUI (no public or NodePort exposure)
+
+proxy:
+  type: LoadBalancer
+  annotations: {}             # set by platform-addons.sh (static IP, resource group)
+  http:
+    enabled: true
+  tls:
+    enabled: false            # Front Door -> Kong over HTTP (origin protocol), no certificate
+
+ingressController:
+  enabled: true
+  ingressClass: kong
+  env:
+    kong_admin_tls_skip_verify: true
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 256Mi}
+
+replicaCount: 1
+
+# Kong joins the mesh so it can reach the STRICT-mTLS services; inbound traffic from Front Door
+# is not intercepted (chart default includeInboundPorts: "").
+podLabels:
+  sidecar.istio.io/inject: "true"
+
+resources:
+  requests: {cpu: 100m, memory: 256Mi}
+  limits: {memory: 512Mi}
+
+extraObjects:
+  # Global: every route is rate limited per client IP.
+  - apiVersion: configuration.konghq.com/v1
+    kind: KongClusterPlugin
+    metadata:
+      name: rate-limiting
+      annotations:
+        kubernetes.io/ingress.class: kong
+      labels:
+        global: "true"
+    plugin: rate-limiting
+    config:
+      second: 50
+      minute: 1200
+      limit_by: ip
+      policy: local

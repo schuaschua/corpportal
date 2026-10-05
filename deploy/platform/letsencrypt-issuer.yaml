@@ -1,0 +1,20 @@
+# dev only (no Front Door): Let's Encrypt certificates for Kong's DNS name, HTTP-01 through Kong.
+# The solver pod stays out of the mesh: Kong's sidecar reaches a sidecar-less pod in plaintext,
+# and STRICT mTLS only applies to pods that have a sidecar.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-account
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: kong
+            podTemplate:
+              metadata:
+                labels:
+                  sidecar.istio.io/inject: "false"

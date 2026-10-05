@@ -1,0 +1,100 @@
+# HashiCorp Vault (chart hashicorp/vault, versions.env): one standalone server, integrated
+# storage (Raft) on a PVC, auto-unseal with the Key Vault key `vault-unseal` (Terraform), the
+# Agent injector for the corportal pods, Kubernetes auth. Never dev mode.
+# Installed per region (release `vault`, namespace `vault`) by ci/scripts/platform-addons.sh,
+# which adds from Terraform:
+#   server.serviceAccount.annotations.azure.workload.identity/client-id  (vault_identity_client_id)
+#   server.extraEnvironmentVars.VAULT_AZUREKEYVAULT_VAULT_NAME           (key_vault_name)
+#   server.extraEnvironmentVars.VAULT_AZUREKEYVAULT_KEY_NAME             (vault_unseal_key_name)
+# Then ci/scripts/vault-bootstrap.sh initialises it once, enables KV v2 and Kubernetes auth,
+# and seeds secret/corportal/<service>.
+#
+# Identity (P-3): the server's service account vault/vault is federated to id-corportal-vault
+# (Key Vault Crypto User), so the seal authenticates by workload identity, with no stored keys.
+# Key Vault is reached through its private endpoint (privatelink DNS is linked to every VNet).
+
+global:
+  enabled: true
+  tlsDisable: true            # in-cluster only (ClusterIP); never exposed outside the cluster
+
+injector:
+  enabled: true
+  replicas: 1
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {memory: 128Mi}
+  agentDefaults:
+    cpuRequest: 25m
+    cpuLimit: 250m
+    # Vault 2.x agent thrashes at 64Mi (stuck in pre-populate, no logs): 64Mi / 256Mi.
+    memRequest: 64Mi
+    memLimit: 256Mi
+
+server:
+  dev:
+    enabled: false
+  ha:
+    enabled: false
+  standalone:
+    enabled: true
+    config: |-
+      ui = false
+      disable_mlock = true
+
+      listener "tcp" {
+        tls_disable     = 1
+        address         = "[::]:8200"
+        cluster_address = "[::]:8201"
+      }
+
+      storage "raft" {
+        path    = "/vault/data"
+        node_id = "vault-0"
+      }
+
+      # Vault name, key name, tenant and client come from the environment
+      # (VAULT_AZUREKEYVAULT_*, and AZURE_TENANT_ID / AZURE_CLIENT_ID /
+      # AZURE_FEDERATED_TOKEN_FILE injected by the workload identity webhook).
+      seal "azurekeyvault" {}
+
+      api_addr     = "http://vault.vault.svc:8200"
+      cluster_addr = "http://vault-0.vault-internal:8201"
+
+  serviceAccount:
+    create: true
+    name: vault               # federated subject system:serviceaccount:vault:vault (Terraform `identity`)
+    annotations: {}           # azure.workload.identity/client-id, set by platform-addons.sh
+
+  extraLabels:
+    azure.workload.identity/use: "true"
+
+  extraEnvironmentVars:
+    VAULT_AZUREKEYVAULT_VAULT_NAME: ""
+    VAULT_AZUREKEYVAULT_KEY_NAME: vault-unseal
+
+  dataStorage:
+    enabled: true
+    size: 1Gi
+    storageClass: null        # AKS default (managed-csi)
+
+  auditStorage:
+    enabled: false
+
+  service:
+    type: ClusterIP
+
+  ingress:
+    enabled: false
+
+  authDelegator:
+    enabled: true             # Kubernetes auth: Vault reviews the pods' service account tokens
+
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 256Mi}
+
+ui:
+  enabled: false
+
+csi:
+  enabled: false

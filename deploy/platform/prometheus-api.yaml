@@ -1,0 +1,59 @@
+# prod only (applied in every region by ci/scripts/platform-addons.sh when Terraform has a Front
+# Door): Prometheus through Front Door -> Kong at /prometheus (e.g. /prometheus/api/v1/query), for the owner's
+# dashboard fetch on the Mac. Front Door is active-passive (priority), so this is the primary's
+# Prometheus, which federates region 2's pod and container series (monitoring-values.yaml); after
+# a failover it is region 2's own Prometheus.
+# Two locks: our X-Azure-FDID (P-7, anything else gets the 403 catch-all) and an API key in the
+# `apikey` header (Kong OSS key-auth). The key is the Jenkins folder credential
+# corportal-prometheus-api-key; platform-addons.sh puts it in the Secret prometheus-api-key.
+# GET only (the API and the read-only web UI). The admin API and remote-write receiver stay off
+# (chart defaults).
+# __FDID__ is replaced by platform-addons.sh.
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: prometheus-key-auth
+  namespace: monitoring
+plugin: key-auth
+config:
+  key_names: [apikey]
+  hide_credentials: true
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: prometheus-reader
+  namespace: monitoring
+  annotations:
+    kubernetes.io/ingress.class: kong
+username: prometheus-reader
+credentials:
+  - prometheus-api-key
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus-api
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: corportal
+  annotations:
+    konghq.com/headers.x-azure-fdid: "__FDID__"
+    konghq.com/plugins: prometheus-key-auth
+    konghq.com/methods: GET
+    konghq.com/strip-path: "true"
+    konghq.com/protocols: "http,https"
+    konghq.com/preserve-host: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - path: /prometheus
+            pathType: Prefix
+            backend:
+              service:
+                name: monitoring-kube-prometheus-prometheus
+                port:
+                  number: 9090

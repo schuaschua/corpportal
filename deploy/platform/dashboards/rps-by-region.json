@@ -1,0 +1,71 @@
+{
+  "uid": "corportal-rps-by-region",
+  "title": "Requests per second by region",
+  "description": "corportal: requests per second served in each region (Istio request metrics, reporter=destination). Act 5 of the demo.",
+  "tags": ["corportal"],
+  "editable": false,
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {"from": "now-15m", "to": "now"},
+  "refresh": "10s",
+  "timezone": "browser",
+  "templating": {"list": []},
+  "annotations": {"list": []},
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Requests per second by region",
+      "gridPos": {"h": 12, "w": 16, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (region) (rate(istio_requests_total{reporter=\"destination\", destination_workload_namespace=\"corportal\"}[1m]))",
+          "legendFormat": "{{region}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "reqps", "min": 0, "custom": {"lineWidth": 2, "fillOpacity": 10}},
+        "overrides": []
+      },
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Current requests per second",
+      "gridPos": {"h": 12, "w": 8, "x": 16, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (region) (rate(istio_requests_total{reporter=\"destination\", destination_workload_namespace=\"corportal\"}[1m]))",
+          "legendFormat": "{{region}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "reqps", "decimals": 1}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "colorMode": "none"}
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Requests per second by region and service",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (region, destination_workload) (rate(istio_requests_total{reporter=\"destination\", destination_workload_namespace=\"corportal\"}[1m]))",
+          "legendFormat": "{{region}} {{destination_workload}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "reqps", "min": 0}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    }
+  ]
+}

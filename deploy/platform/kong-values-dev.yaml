@@ -1,0 +1,6 @@
+# dev only, layered on kong-values.yaml: no Front Door, so Kong itself serves HTTPS on its public
+# IP (certificate from cert-manager, Ingress tls in the corportal chart). Port 80 stays open for
+# the Let's Encrypt HTTP-01 challenge.
+proxy:
+  tls:
+    enabled: true

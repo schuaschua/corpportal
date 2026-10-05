@@ -1,0 +1,9 @@
+apiVersion: v2
+name: corportal
+description: >-
+  Corporate Portal PoC: the five services (accounts-api, payments-api, insights-api,
+  outbox-relay, portal-web) on AKS, behind Kong, in the managed Istio mesh, with secrets
+  from Vault Agent. Jenkins deploys it with `helm upgrade --install` (architecture 5b).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

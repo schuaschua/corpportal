@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Corporate Portal Mockup</title>
+<style>
+/* Governing spines: DESIGN.md (tokens, Components) and EXPERIENCE.md (IA, Component Patterns, State Patterns, Key Flows).
+   Spines win on conflict. Offline, no JS: screens switch with :target (links in the nav). */
+:root{--brand:#0F6CBD;--brand-hover:#115EA3;--surface:#FFFFFF;--canvas:#FAFAFA;--stroke:#D1D1D1;--stroke2:#E0E0E0;
+--text:#242424;--muted:#616161;--success:#107C10;--warning:#BC4B09;--warning-bg:#FDF6F3;--danger:#C50F1F;--danger-bg:#FDF3F4;--synth:#FFF4CE;
+--r-md:4px;--r-lg:8px;--shadow4:0 0 2px rgba(0,0,0,.12),0 2px 4px rgba(0,0,0,.14);--shadow16:0 0 2px rgba(0,0,0,.12),0 8px 16px rgba(0,0,0,.14)}
+*{box-sizing:border-box}
+body{margin:0;font:400 14px/20px "Segoe UI",-apple-system,system-ui,sans-serif;color:var(--text);background:var(--canvas)}
+a{color:var(--brand);text-decoration:none}
+.synth{height:24px;background:var(--synth);font-size:12px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid #F2E2A0}
+.topbar{height:48px;background:var(--surface);border-bottom:1px solid var(--stroke2);display:flex;align-items:center;padding:0 16px;gap:16px}
+.logo{font-weight:600;display:flex;align-items:center;gap:8px}
+.logo i{width:20px;height:20px;border-radius:4px;background:var(--brand);display:inline-block}
+.company{color:var(--muted);border-left:1px solid var(--stroke2);padding-left:16px}
+.spacer{flex:1}
+.badge{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--stroke);border-radius:9999px;padding:2px 10px;font-size:12px;background:var(--surface)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--success)}
+.avatar{width:28px;height:28px;border-radius:50%;background:#C7E0F4;color:#0F548C;display:grid;place-items:center;font-size:12px;font-weight:600}
+.user{display:flex;align-items:center;gap:8px;font-size:12px}
+.shell{display:flex;min-height:calc(100vh - 72px)}
+nav{width:240px;background:var(--surface);border-right:1px solid var(--stroke2);padding:12px 8px}
+nav a{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--r-md);color:var(--text)}
+nav a:hover{background:#F5F5F5}
+nav .sep{height:1px;background:var(--stroke2);margin:12px 4px}
+nav .demo{font-size:12px;color:var(--muted);padding:4px 12px}
+main{flex:1;padding:24px;min-width:0}
+.screen{display:none}
+.screen:target{display:block}
+body:not(:has(.screen:target)) #dashboard{display:block}
+body:has(#login:target) .chrome{display:none}
+body:has(#failover:target) .south{display:none}
+body:not(:has(#failover:target)) .west{display:none}
+body:has(#dashboard:target) nav a[href="#dashboard"],body:not(:has(.screen:target)) nav a[href="#dashboard"],
+body:has(#accounts:target) nav a[href="#accounts"],body:has(#payments:target) nav a[href="#payments"],
+body:has(#forecast:target) nav a[href="#forecast"],body:has(#failover:target) nav a[href="#failover"]{background:#EBF3FC;color:var(--brand);font-weight:600}
+h1{font-size:24px;line-height:32px;font-weight:600;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 20px}
+.row{display:flex;gap:16px;align-items:flex-start}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
+.grid2{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.card{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow4);padding:16px}
+.card h3{font-size:14px;font-weight:600;margin:0 0 12px}
+.kpi .label{font-size:12px;color:var(--muted)}
+.kpi .value{font-size:28px;line-height:36px;font-weight:600;margin:4px 0}
+.kpi .delta{color:var(--muted)}
+.kpi.alert .delta{color:var(--danger)}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-weight:600;font-size:12px;color:var(--muted);padding:8px;border-bottom:1px solid var(--stroke2)}
+td{padding:10px 8px;border-bottom:1px solid #F0F0F0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.sel td{background:#EBF3FC}
+.flag{display:inline-flex;align-items:center;gap:4px;border-radius:9999px;padding:1px 8px;font-size:12px;color:var(--warning);background:var(--warning-bg);border:1px solid #F4BFAB}
+.status{font-size:12px;border-radius:9999px;padding:1px 8px;border:1px solid var(--stroke)}
+.status.ok{color:var(--success);border-color:#9FD89F;background:#F1FAF1}
+.status.wait{color:#835B00;border-color:#F2D97C;background:#FFFBEB}
+.status.no{color:var(--danger);border-color:#EEACB2;background:var(--danger-bg)}
+.btn{display:inline-block;border-radius:var(--r-md);padding:5px 12px;font:600 14px/20px inherit;font-family:inherit;border:1px solid var(--stroke);background:var(--surface);color:var(--text);cursor:pointer}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12px;font-weight:600;margin-bottom:4px}
+.input{border:1px solid var(--stroke);border-bottom-color:#616161;border-radius:var(--r-md);padding:5px 10px;background:#fff;width:100%}
+.tip{font-size:12px;color:var(--muted);margin-top:6px}
+.msg{border-radius:var(--r-md);padding:8px 12px;margin-bottom:16px;display:flex;gap:8px;align-items:center}
+.msg.warn{background:#FFF9F5;border:1px solid #FDCFB4}
+.msg.err{background:var(--danger-bg);border:1px solid #EEACB2}
+.msg.ok{background:#F1FAF1;border:1px solid #9FD89F}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:8px}
+.legend span::before{content:"";display:inline-block;width:16px;height:2px;background:var(--brand);vertical-align:middle;margin-right:6px}
+.legend .f::before{background:repeating-linear-gradient(90deg,var(--brand) 0 4px,transparent 4px 7px)}
+.legend .p::before{background:var(--danger)}
+/* Behind the scenes drawer */
+#bts{display:none;position:fixed;top:0;right:0;bottom:0;width:360px;background:var(--surface);box-shadow:var(--shadow16);padding:20px;z-index:10}
+#bts:target{display:block}
+#bts:target~.scrim{display:block}
+.scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.2);z-index:5}
+.steps{list-style:none;padding:0;margin:16px 0}
+.steps li{display:flex;gap:12px;padding:10px 0;border-left:2px solid var(--stroke2);margin-left:9px;padding-left:16px;position:relative}
+.steps li::before{content:"";position:absolute;left:-10px;top:12px;width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid var(--stroke)}
+.steps li.done::before{background:var(--success);border-color:var(--success)}
+.steps li.done::after{content:"✓";position:absolute;left:-6px;top:11px;color:#fff;font-size:12px;font-weight:700}
+.steps li.pending{color:var(--muted)}
+.steps .t{font-size:12px;color:var(--muted)}
+/* Login */
+.login{display:grid;place-items:center;min-height:calc(100vh - 24px)}
+.login .card{width:380px;padding:32px}
+.ms{display:flex;gap:2px;flex-wrap:wrap;width:22px}
+.ms i{width:10px;height:10px;display:block}
+.statenote{font-size:12px;color:var(--muted);border:1px dashed var(--stroke);border-radius:var(--r-md);padding:6px 10px;margin-top:16px}
+</style>
+</head>
+<body>
+<div class="synth">Synthetic data: PoC environment. Not a real bank.</div>
+
+<div class="chrome">
+  <div class="topbar">
+    <div class="logo"><i></i>Contoso Digital Bank</div>
+    <div class="company">Northwind Logistics LLC</div>
+    <div class="spacer"></div>
+    <span class="badge south" aria-live="polite"><span class="dot"></span>Serving from: West US 3</span>
+    <span class="badge west" aria-live="polite"><span class="dot"></span>Serving from: North Central US</span>
+    <div class="user"><div class="avatar">PN</div>Priya Nair · Treasurer ▾</div>
+  </div>
+</div>
+
+<div class="shell">
+  <nav class="chrome">
+    <a href="#dashboard">▦ Dashboard</a>
+    <a href="#accounts">▤ Accounts</a>
+    <a href="#payments">⇄ Payments</a>
+    <a href="#forecast">↗ Forecast</a>
+    <div class="sep"></div>
+    <div class="demo">MOCKUP STATES</div>
+    <a href="#login">Login</a>
+    <a href="#bts">Behind the scenes (drawer)</a>
+    <a href="#failover">Region failover</a>
+  </nav>
+
+  <main>
+    <!-- LOGIN -->
+    <section class="screen" id="login">
+      <div class="login">
+        <div class="card">
+          <div class="logo" style="margin-bottom:24px"><i></i>Contoso Digital Bank</div>
+          <h1 style="font-size:20px;line-height:28px">Corporate banking</h1>
+          <p class="sub">Sign in with your company account.</p>
+          <a class="btn primary" href="#dashboard" style="display:flex;gap:10px;align-items:center;justify-content:center;width:100%;padding:8px">
+            <span class="ms"><i style="background:#F25022"></i><i style="background:#7FBA00"></i><i style="background:#00A4EF"></i><i style="background:#FFB900"></i></span>
+            Sign in with Microsoft
+          </a>
+          <p class="tip" style="margin-top:16px">Access is limited to your company's accounts. Every sign-in is logged.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DASHBOARD -->
+    <section class="screen" id="dashboard">
+      <div class="row" style="justify-content:space-between">
+        <div><h1>Good morning, Priya</h1><p class="sub">Monday 5 Oct · Figures as of 07:45</p></div>
+        <a class="btn" href="#bts">Behind the scenes</a>
+      </div>
+      <div class="grid3">
+        <div class="card kpi"><div class="label">Total cash</div><div class="value">AED 5,800,000</div><div class="delta">Across 4 accounts</div></div>
+        <div class="card kpi alert"><div class="label">Available (excl. Reserve) after scheduled payments</div><div class="value">AED 1,780,000</div><div class="delta">Payroll due Thu 8 Oct: AED 1,900,000</div></div>
+        <div class="card kpi"><div class="label">7-day forecast low</div><div class="value">−AED 120,000</div><div class="delta">Thu 8 Oct, after payroll</div></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h3>Liquidity: last 30 days and next 14</h3>
+          <svg viewBox="0 0 600 180" width="100%" height="180" role="img" aria-label="Balance trend">
+            <line x1="0" y1="150" x2="600" y2="150" stroke="#E0E0E0"/>
+            <line x1="0" y1="140" x2="600" y2="140" stroke="#C50F1F" stroke-dasharray="3 3"/>
+            <text x="4" y="134" font-size="11" fill="#C50F1F">Payroll AED 1.9m</text>
+            <polyline fill="none" stroke="#0F6CBD" stroke-width="2" points="0,90 40,85 80,100 120,70 160,75 200,60 240,95 280,88 320,70 360,80 400,60"/>
+            <polyline fill="none" stroke="#0F6CBD" stroke-width="2" stroke-dasharray="6 4" points="400,60 450,75 500,155 550,120 600,110"/>
+            <line x1="400" y1="20" x2="400" y2="170" stroke="#616161" stroke-dasharray="2 3"/>
+            <text x="404" y="30" font-size="11" fill="#616161">Today</text>
+          </svg>
+          <div class="legend"><span>Actual</span><span class="f">Forecast</span><span class="p">Payroll threshold</span></div>
+        </div>
+        <div class="card">
+          <h3>Unusual payments</h3>
+          <table>
+            <tr><td>Harbour Freight Co<br><span class="tip">Fri 2 Oct</span></td><td class="num">AED 225,000<br><span class="flag">⚠ Unusual</span></td></tr>
+          </table>
+          <p class="tip">4× this supplier's average. Score 0.91 (Isolation Forest v3).</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ACCOUNTS -->
+    <section class="screen" id="accounts">
+      <h1>Accounts</h1><p class="sub">4 accounts · Northwind Logistics LLC</p>
+      <div class="card" style="margin-bottom:16px">
+        <table>
+          <tr><th>Account</th><th>Number</th><th>Currency</th><th class="num">Balance</th></tr>
+          <tr class="sel"><td>Operating</td><td>AE07 0331 0000 1122 3344 001</td><td>AED</td><td class="num">AED 2,860,000</td></tr>
+          <tr><td>Reserve</td><td>AE07 0331 0000 5566 7788 002</td><td>AED</td><td class="num">AED 2,240,000</td></tr>
+          <tr><td>Payroll</td><td>AE07 0331 0000 9900 1122 003</td><td>AED</td><td class="num">AED 150,000</td></tr>
+          <tr><td>Collections</td><td>AE07 0331 0000 4455 6677 004</td><td>AED</td><td class="num">AED 550,000</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Operating: recent transactions</h3>
+        <table>
+          <tr><th>Date</th><th>Description</th><th class="num">Amount</th><th class="num">Balance</th></tr>
+          <tr><td>2 Oct</td><td>Harbour Freight Co <span class="flag">⚠ Unusual</span></td><td class="num">−AED 225,000</td><td class="num">AED 2,860,000</td></tr>
+          <tr><td>1 Oct</td><td>Fabrikam Retail: INV-2291</td><td class="num">+AED 590,000</td><td class="num">AED 3,085,000</td></tr>
+          <tr><td>30 Sep</td><td>Fleet fuel card settlement</td><td class="num">−AED 86,000</td><td class="num">AED 2,495,000</td></tr>
+          <tr><td>29 Sep</td><td>Tailspin Toys: INV-2284</td><td class="num">+AED 347,000</td><td class="num">AED 2,581,000</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- PAYMENTS -->
+    <section class="screen" id="payments">
+      <div class="row" style="justify-content:space-between">
+        <div><h1>Payments</h1><p class="sub">Every payment needs a second approver.</p></div>
+        <a class="btn" href="#bts">Behind the scenes</a>
+      </div>
+      <div class="row">
+        <div class="card" style="width:340px;flex:none">
+          <h3>New payment</h3>
+          <div class="field"><label>From</label><div class="input">Reserve · AED 2,240,000 ▾</div></div>
+          <div class="field"><label>To</label><div class="input">Northwind Operating (own account) ▾</div></div>
+          <div class="field"><label>Amount</label><div class="input">AED 450,000.00</div></div>
+          <div class="field"><label>Date</label><div class="input">Mon 5 Oct 2026</div></div>
+          <div class="field"><label>Reference</label><div class="input">Payroll top-up</div></div>
+          <button class="btn primary">Submit for approval</button>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="card" style="margin-bottom:16px">
+            <h3>Awaiting approval</h3>
+            <table>
+              <tr><th>Payment</th><th>Created by</th><th class="num">Amount</th><th>Status</th><th></th></tr>
+              <tr><td>PAY-10482 · Payroll top-up</td><td>Priya Nair</td><td class="num">AED 450,000</td><td><span class="status wait">Awaiting approval from Tom Okafor</span></td>
+                <td><button class="btn" disabled>Approve</button> <button class="btn" disabled>Reject</button><div class="tip">You can't approve a payment you created.</div></td></tr>
+            </table>
+          </div>
+          <div class="card">
+            <h3>History</h3>
+            <table>
+              <tr><th>Date</th><th>Beneficiary</th><th class="num">Amount</th><th>Status</th></tr>
+              <tr><td>2 Oct</td><td>Harbour Freight Co <span class="flag" title="Score 0.91: 4× this supplier's average">⚠ Unusual</span></td><td class="num">AED 225,000</td><td><span class="status ok">Executed</span></td></tr>
+              <tr><td>1 Oct</td><td>Litware Fuel Ltd</td><td class="num">AED 60,000</td><td><span class="status ok">Executed</span></td></tr>
+              <tr><td>30 Sep</td><td>Proseware Leasing</td><td class="num">AED 103,000</td><td><span class="status no">Rejected</span></td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FORECAST -->
+    <section class="screen" id="forecast">
+      <h1>Cash forecast</h1><p class="sub">Next 30 days · Model: cash_forecast v7 (MLflow, Unity Catalog) · Trained on synthetic data</p>
+      <div class="card">
+        <svg viewBox="0 0 900 260" width="100%" height="260" role="img" aria-label="30-day forecast">
+          <line x1="0" y1="200" x2="900" y2="200" stroke="#C50F1F" stroke-dasharray="3 3"/>
+          <text x="4" y="194" font-size="11" fill="#C50F1F">Payroll threshold AED 1.9m</text>
+          <polygon fill="#0F6CBD" fill-opacity=".10" points="300,80 400,70 500,150 600,110 700,90 800,100 900,80 900,150 800,170 700,160 600,190 500,250 400,140 300,80"/>
+          <polyline fill="none" stroke="#0F6CBD" stroke-width="2" points="0,120 60,110 120,130 180,95 240,100 300,80"/>
+          <polyline fill="none" stroke="#0F6CBD" stroke-width="2" stroke-dasharray="6 4" points="300,80 400,105 500,205 600,150 700,125 800,135 900,115"/>
+          <line x1="300" y1="20" x2="300" y2="250" stroke="#616161" stroke-dasharray="2 3"/><text x="304" y="30" font-size="11" fill="#616161">Today</text>
+          <text x="505" y="222" font-size="11" fill="#C50F1F">Thu 8 Oct: AED 1.78m (−AED 120k)</text>
+        </svg>
+        <div class="legend"><span>Actual</span><span class="f">Forecast (80% band shaded)</span><span class="p">Payroll threshold</span></div>
+      </div>
+      <p class="statenote">After the AED 450k top-up is approved and the batch runs, the Thursday low becomes AED 2.23m and the dashed line stays above the threshold. (EXPERIENCE.md Flow 1 climax.)</p>
+    </section>
+
+    <!-- FAILOVER STATE -->
+    <section class="screen" id="failover">
+      <div class="msg ok">✓ Connected again. The badge in the top bar now reads <b>Serving from: North Central US</b>.</div>
+      <h1>Good morning, Priya</h1><p class="sub">Same data, served from the second region</p>
+      <div class="grid3">
+        <div class="card kpi"><div class="label">Total cash</div><div class="value">AED 5,800,000</div><div class="delta">Across 4 accounts</div></div>
+        <div class="card kpi"><div class="label">Available (excl. Reserve) after scheduled payments</div><div class="value">AED 2,230,000</div><div class="delta">Payroll covered ✓</div></div>
+        <div class="card kpi"><div class="label">Last payment</div><div class="value">AED 450,000</div><div class="delta">PAY-10482 · Executed</div></div>
+      </div>
+      <p class="statenote">During the switch (up to about 60 s), this warning shows instead: <span class="msg warn" style="display:inline-flex;margin:0">⚠ Can't reach the bank right now. Retrying…</span></p>
+      <p class="statenote">Cross-company attempt state: <span class="msg err" style="display:inline-flex;margin:0">✕ You don't have access to that company's data.</span></p>
+    </section>
+  </main>
+</div>
+
+<!-- BEHIND THE SCENES DRAWER (overlays the dashboard) -->
+<aside id="bts" aria-label="Behind the scenes">
+  <div class="row" style="justify-content:space-between"><h3 style="margin:0;font-size:20px;line-height:28px">Behind the scenes</h3><a class="btn" href="#dashboard">✕</a></div>
+  <p class="tip">PAY-10482 · AED 450,000 · approved by Tom Okafor 07:52</p>
+  <ol class="steps">
+    <li class="done"><div><b>Ledger</b><div class="t">Azure SQL · 07:52:10</div></div></li>
+    <li class="done"><div><b>Event Hubs</b><div class="t">payments topic · 07:52:11</div></div></li>
+    <li class="done"><div><b>Bronze</b><div class="t">ADLS · raw event · 07:52:40</div></div></li>
+    <li class="done"><div><b>Silver</b><div class="t">Validated, matched to account · 07:52:48</div></div></li>
+    <li class="pending"><div><b>Gold</b><div class="t">Cash position, forecast, anomaly score</div></div></li>
+    <li class="pending"><div><b>Serving</b><div class="t">Portal figures update</div></div></li>
+  </ol>
+  <p class="tip">Next batch in 0:24 · cadence 30 s</p>
+  <a class="btn" href="#">View lineage in Unity Catalog ↗</a>
+</aside>
+<a class="scrim" href="#dashboard" aria-hidden="true"></a>
+</body>
+</html>

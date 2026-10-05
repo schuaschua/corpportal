@@ -1,0 +1,14 @@
+{{- if .Values.istio.mtlsStrict }}
+# mTLS STRICT for every workload in the release namespace (stack.md, managed Istio add-on).
+# Kong must itself be in the mesh to reach these services.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: corportal-strict
+  labels:
+    app.kubernetes.io/part-of: corportal
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  mtls:
+    mode: STRICT
+{{- end }}

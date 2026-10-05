@@ -1,0 +1,143 @@
+# A slim kube-prometheus-stack (chart prometheus-community/kube-prometheus-stack, versions.env):
+# Prometheus Operator, one Prometheus, kube-state-metrics and Grafana. No Alertmanager, no node
+# exporter, no default rules or dashboards (cost ceiling, P-9: shares the B2s system node).
+# Installed per region (release `monitoring`, namespace `monitoring`) by
+# ci/scripts/platform-addons.sh, which adds:
+#   corportal.region                      the cluster's Azure region (label on every Istio series)
+#   corportal.federateTarget              primary only, with region 2 on: region 2's Prometheus
+#                                         internal load balancer, <ip>:9090, over VNet peering
+#   prometheus.service.type=LoadBalancer  region 2 only (internal: annotation below)
+#   grafana.enabled=false                 region 2 only: the primary Grafana shows both regions
+#   grafana.dashboards.corportal.rps-by-region.json  --set-file dashboards/rps-by-region.json
+#   a `region` label on kube-state-metrics and cAdvisor series (--set-json relabelings)
+# Pod and container data for the owner's dashboard: kube-state-metrics (phase, restarts, ready,
+# OOMKilled, requests and limits) and the kubelet's cAdvisor (CPU and memory use). The primary
+# federates region 2's copy of those series; prod exposes the primary's API through Kong
+# (prometheus-api.yaml).
+# Grafana's admin password comes from Key Vault (secret grafana-admin-password) through the
+# Kubernetes secret `grafana-admin`. Nothing here is public: Grafana and Prometheus are
+# ClusterIP (Grafana is reached with kubectl port-forward, README).
+
+corportal:
+  region: local
+  federateTarget: ""
+
+crds:
+  enabled: true
+
+defaultRules:
+  create: false
+
+alertmanager:
+  enabled: false
+
+nodeExporter:
+  enabled: false
+
+windowsMonitoring:
+  enabled: false
+
+# The managed control plane is not scrapable on AKS.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+prometheusOperator:
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {memory: 256Mi}
+
+kube-state-metrics:
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 128Mi}
+
+prometheus:
+  service:
+    type: ClusterIP
+    annotations:
+      # Only takes effect in region 2 (type LoadBalancer): a private IP in the VNet, reached by
+      # the primary Prometheus over the peering. Never a public IP.
+      service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+  prometheusSpec:
+    retention: 2d
+    retentionSize: 1GB
+    scrapeInterval: 30s
+    externalLabels:
+      region: "{{ .Values.corportal.region }}"
+    resources:
+      requests: {cpu: 100m, memory: 512Mi}
+      limits: {memory: 1Gi}
+    # Istio request metrics from every sidecar (Envoy's merged stats port 15090), labelled
+    # with the cluster region; in the primary, also region 2's Istio, pod and container series
+    # through /federate.
+    additionalScrapeConfigs: |
+      - job_name: istio-requests
+        metrics_path: /stats/prometheus
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_container_name, __meta_kubernetes_pod_container_port_name]
+            action: keep
+            regex: istio-proxy;http-envoy-prom
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - target_label: region
+            replacement: {{ .Values.corportal.region | quote }}
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            action: keep
+            regex: istio_requests_total
+      {{- with .Values.corportal.federateTarget }}
+      - job_name: federate-secondary
+        honor_labels: true
+        metrics_path: /federate
+        params:
+          "match[]":
+            - '{job="istio-requests"}'
+            - '{__name__=~"kube_pod_status_phase|kube_pod_status_ready|kube_pod_container_status_ready|kube_pod_container_status_restarts_total|kube_pod_container_status_last_terminated_reason|kube_pod_container_resource_requests|kube_pod_container_resource_limits|container_cpu_usage_seconds_total|container_memory_working_set_bytes"}'
+        static_configs:
+          - targets: [{{ . | quote }}]
+      {{- end }}
+
+grafana:
+  enabled: true
+  defaultDashboardsEnabled: false
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: false
+  persistence:
+    enabled: false          # the dashboard is provisioned from this repo on every install
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 256Mi}
+  sidecar:
+    resources:
+      requests: {cpu: 10m, memory: 32Mi}
+      limits: {memory: 96Mi}
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: corportal
+          orgId: 1
+          folder: corportal
+          type: file
+          disableDeletion: true
+          editable: false
+          options:
+            path: /var/lib/grafana/dashboards/corportal
+  dashboards:
+    corportal: {}           # rps-by-region.json, added with --set-file by platform-addons.sh

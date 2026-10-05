@@ -1,0 +1,54 @@
+{{- /*
+Kong ingress, one Ingress per exposed service (each needs its own strip-path setting).
+prod (P-7): Kong only matches a route when X-Azure-FDID equals our Front Door's ID, so requests
+that did not come through our Front Door are refused with 403 by the Kong catch-all route
+(deploy/platform/kong-values.yaml). dev: no Front Door; HTTPS on ingress.host instead.
+*/ -}}
+{{- $tls := .Values.ingress.tls }}
+{{- if not (or .Values.global.frontDoorId $tls.enabled) }}
+{{- fail "set global.frontDoorId (prod, P-7) or ingress.tls.enabled with ingress.host (dev)" }}
+{{- end }}
+{{- if and $tls.enabled (not .Values.ingress.host) }}
+{{- fail "ingress.tls.enabled needs ingress.host (the certificate's name)" }}
+{{- end }}
+{{- range $name, $svc := .Values.services }}
+{{- if and $svc.enabled $svc.port $svc.ingressPath }}
+{{- $ctx := dict "root" $ "name" $name }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "corportal.labels" $ctx | nindent 4 }}
+  annotations:
+    {{- with $.Values.global.frontDoorId }}
+    konghq.com/headers.x-azure-fdid: {{ . | quote }}
+    {{- end }}
+    konghq.com/strip-path: {{ $svc.stripPath | default false | quote }}
+    konghq.com/protocols: "http,https"
+    # Send the Service's name as Host: Kong's Istio sidecar routes by Host, and an unknown
+    # (Front Door) Host falls through to plaintext, which STRICT mTLS rejects (503).
+    konghq.com/preserve-host: "false"
+spec:
+  ingressClassName: {{ $.Values.ingress.className }}
+  {{- if $tls.enabled }}
+  tls:
+    - hosts: [{{ $.Values.ingress.host | quote }}]
+      secretName: {{ $tls.secretName }}
+  {{- end }}
+  rules:
+    - {{- with $.Values.ingress.host }}
+      host: {{ . | quote }}
+      {{- end }}
+      http:
+        paths:
+          - path: {{ $svc.ingressPath }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $name }}
+                port:
+                  name: http
+{{- end }}
+{{- end }}

@@ -1,0 +1,24 @@
+{{- range $name, $svc := .Values.services }}
+{{- if and $svc.enabled $svc.port }}
+{{- $ctx := dict "root" $ "name" $name }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "corportal.labels" $ctx | nindent 4 }}
+  annotations:
+    # Kong proxies to the Service's cluster IP rather than pod IPs, so Istio sees the
+    # Service host and applies mTLS and routing to it.
+    ingress.kubernetes.io/service-upstream: "true"
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "corportal.selector" $ctx | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $svc.port }}
+      targetPort: http
+{{- end }}
+{{- end }}

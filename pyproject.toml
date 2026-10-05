@@ -1,0 +1,41 @@
+[project]
+name = "corportal"
+version = "0.1.0"
+description = "Corporate Portal PoC: ledger, synthetic data generator, accounts, payments and insights APIs, outbox relay"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "corp-common",
+    "uvicorn[standard]>=0.30",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "httpx>=0.27",
+]
+# services/outbox-relay only (its image syncs --group relay).
+relay = [
+    "azure-eventhub>=5.12",
+    "azure-identity>=1.19",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["services/common"]
+
+[tool.uv.sources]
+corp-common = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider --basetemp=.work/pytest"
+markers = [
+    "spark: needs a JVM + pyspark/delta-spark (ML tests also scikit-learn/MLflow); skipped otherwise, run them in databricks/Dockerfile.local",
+]
+filterwarnings = [
+    "ignore:Dialect sqlite\\+pysqlite does .not. support Decimal objects natively",
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+    "ignore:Hint. Inferred schema contains integer column",
+]

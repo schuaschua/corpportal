@@ -1,0 +1,263 @@
+# Databricks Asset Bundle: the medallion job (bronze -> silver -> gold -> score -> serving),
+# and two ML jobs on the same single-node cluster definition: corportal-backfill (manual,
+# one-off: seeded ledger history into the lake) and corportal-ml-train (manual, or daily
+# once its schedule is unpaused). Models are registered in Unity Catalog as
+# <catalog>.ml.cash_forecast and <catalog>.ml.payment_anomaly (MLflow, scikit-learn).
+# Jenkins deploys it (piece 5):
+#   databricks bundle deploy -t <target> --var eventhub_namespace=<ns>.servicebus.windows.net \
+#     --var sql_server=<server>.database.windows.net --var catalog=corportal
+# The workspace host and auth come from the environment (DATABRICKS_HOST + workload identity).
+#
+# One job cluster, single node, per run; each run drains Event Hubs with availableNow and
+# stops. No always-on streaming, no SQL warehouse, no model serving endpoints (scoring is a
+# batch task writing SQL serving tables).
+
+bundle:
+  name: corportal-pipelines
+
+variables:
+  catalog:
+    description: Unity Catalog catalog holding the bronze, silver and gold schemas.
+    default: corportal
+  batch_cadence_seconds:
+    description: BATCH_CADENCE_SECONDS. Seconds between batches; the portal's "Next batch" countdown uses it.
+    default: "300"
+  batch_schedule:
+    description: >-
+      Quartz cron for the job trigger. Must match batch_cadence_seconds (bundle variables
+      can't do arithmetic): 300 s = "0 0/5 * * * ?".
+    default: "0 0/5 * * * ?"
+  as_of:
+    description: Business date override (YYYY-MM-DD) matching the ledger seed; empty = today, Gulf time.
+    default: ""
+  eventhub_namespace:
+    description: Event Hubs namespace FQDN, read over its Kafka endpoint.
+    default: "evhns-portal-placeholder.servicebus.windows.net"
+  eventhub_name:
+    default: portal-events
+  eventhub_service_credential:
+    description: Unity Catalog service credential with Event Hubs Data Receiver on the namespace.
+    default: "sc-portal-eventhubs"
+  sql_server:
+    description: Azure SQL server FQDN (the failover group listener on Saturday).
+    default: "sql-portal-placeholder.database.windows.net"
+  sql_database:
+    default: corportal
+  sql_service_credential:
+    description: >-
+      Unity Catalog service credential whose identity is a member of the pipeline_writer
+      database role (db/rls.sql, db/init_db.py).
+    default: "sc-portal-sql"
+  spark_version:
+    default: 15.4.x-scala2.12   # Spark 3.5 LTS, same as Dockerfile.local
+  node_type_id:
+    default: Standard_D4ds_v5   # smallest VM the single-node cluster policy allows
+  train_schedule:
+    description: Quartz cron for corportal-ml-train (daily); the schedule starts paused (P-9).
+    default: "0 30 2 * * ?"
+  train_schedule_status:
+    description: PAUSED (manual runs only) or UNPAUSED (daily).
+    default: PAUSED
+
+artifacts:
+  corp_pipelines:
+    type: whl
+    path: .
+    build: uv build --wheel   # uv on the Jenkins VM; `python -m build` needs python3-venv
+
+resources:
+  schemas:
+    bronze:
+      catalog_name: ${var.catalog}
+      name: bronze
+      comment: Raw portal events from Event Hubs, as received.
+    silver:
+      catalog_name: ${var.catalog}
+      name: silver
+      comment: Typed, deduplicated transactions and payments.
+    gold:
+      catalog_name: ${var.catalog}
+      name: gold
+      comment: Daily cash position, daily flows and payment features.
+    ml:
+      catalog_name: ${var.catalog}
+      name: ml
+      comment: Registered models (MLflow) - cash_forecast, payment_anomaly.
+
+  volumes:
+    checkpoints:
+      catalog_name: ${var.catalog}
+      schema_name: ${resources.schemas.bronze.name}
+      name: checkpoints
+      volume_type: MANAGED
+      comment: Structured Streaming checkpoints for the bronze read.
+
+  jobs:
+    medallion:
+      name: corportal-medallion
+      max_concurrent_runs: 1
+      schedule:
+        quartz_cron_expression: ${var.batch_schedule}
+        timezone_id: UTC
+        pause_status: UNPAUSED   # development mode pauses it: dev runs are on demand
+      job_clusters:
+        - job_cluster_key: single_node
+          new_cluster:
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type_id}
+            num_workers: 0
+            data_security_mode: SINGLE_USER
+            spark_conf:
+              spark.master: "local[*, 4]"
+              spark.databricks.cluster.profile: singleNode
+              spark.sql.session.timeZone: UTC
+            custom_tags:
+              ResourceClass: SingleNode
+            spark_env_vars:
+              CATALOG: ${var.catalog}
+              BRONZE_SOURCE: kafka
+              EVENTHUB_NAMESPACE: ${var.eventhub_namespace}
+              EVENTHUB_NAME: ${var.eventhub_name}
+              EVENTHUB_SERVICE_CREDENTIAL: ${var.eventhub_service_credential}
+              CHECKPOINT_VOLUME: checkpoints
+              SQL_SERVER: ${var.sql_server}
+              SQL_DATABASE: ${var.sql_database}
+              SQL_SERVICE_CREDENTIAL: ${var.sql_service_credential}
+              BATCH_CADENCE_SECONDS: ${var.batch_cadence_seconds}
+              AS_OF: ${var.as_of}
+      tasks:
+        - task_key: bronze
+          job_cluster_key: single_node
+          python_wheel_task:
+            package_name: corp_pipelines
+            entry_point: corp-pipelines
+            parameters: ["bronze", "--run-id", "{{job.run_id}}", "--started-at", "{{job.start_time.iso_datetime}}"]
+          libraries:
+            - whl: ./dist/*.whl
+        - task_key: silver
+          depends_on: [{task_key: bronze}]
+          job_cluster_key: single_node
+          python_wheel_task:
+            package_name: corp_pipelines
+            entry_point: corp-pipelines
+            parameters: ["silver", "--run-id", "{{job.run_id}}", "--started-at", "{{job.start_time.iso_datetime}}"]
+          libraries:
+            - whl: ./dist/*.whl
+        - task_key: gold
+          depends_on: [{task_key: silver}]
+          job_cluster_key: single_node
+          python_wheel_task:
+            package_name: corp_pipelines
+            entry_point: corp-pipelines
+            parameters: ["gold", "--run-id", "{{job.run_id}}", "--started-at", "{{job.start_time.iso_datetime}}"]
+          libraries:
+            - whl: ./dist/*.whl
+        - task_key: score
+          depends_on: [{task_key: gold}]
+          job_cluster_key: single_node
+          python_wheel_task:
+            package_name: corp_pipelines
+            entry_point: corp-pipelines
+            parameters: ["score", "--run-id", "{{job.run_id}}", "--started-at", "{{job.start_time.iso_datetime}}"]
+          libraries:
+            - whl: ./dist/*.whl
+        - task_key: serving
+          depends_on: [{task_key: score}]
+          run_if: ALL_DONE   # a failed scoring run must not hold back the cash position
+          job_cluster_key: single_node
+          python_wheel_task:
+            package_name: corp_pipelines
+            entry_point: corp-pipelines
+            parameters: ["serving", "--run-id", "{{job.run_id}}", "--started-at", "{{job.start_time.iso_datetime}}"]
+          libraries:
+            - whl: ./dist/*.whl
+
+    backfill:
+      name: corportal-backfill
+      max_concurrent_runs: 1
+      # No schedule: run once by hand after the first deploy (idempotent if run again).
+      job_clusters:
+        - job_cluster_key: single_node
+          new_cluster:
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type_id}
+            num_workers: 0
+            data_security_mode: SINGLE_USER
+            spark_conf:
+              spark.master: "local[*, 4]"
+              spark.databricks.cluster.profile: singleNode
+              spark.sql.session.timeZone: UTC
+            custom_tags:
+              ResourceClass: SingleNode
+            spark_env_vars:
+              CATALOG: ${var.catalog}
+              BRONZE_SOURCE: kafka
+              EVENTHUB_NAMESPACE: ${var.eventhub_namespace}
+              EVENTHUB_NAME: ${var.eventhub_name}
+              EVENTHUB_SERVICE_CREDENTIAL: ${var.eventhub_service_credential}
+              CHECKPOINT_VOLUME: checkpoints
+              SQL_SERVER: ${var.sql_server}
+              SQL_DATABASE: ${var.sql_database}
+              SQL_SERVICE_CREDENTIAL: ${var.sql_service_credential}
+              BATCH_CADENCE_SECONDS: ${var.batch_cadence_seconds}
+              AS_OF: ${var.as_of}
+      tasks:
+        - task_key: backfill
+          job_cluster_key: single_node
+          python_wheel_task:
+            package_name: corp_pipelines
+            entry_point: corp-pipelines
+            parameters: ["backfill", "--run-id", "{{job.run_id}}", "--started-at", "{{job.start_time.iso_datetime}}"]
+          libraries:
+            - whl: ./dist/*.whl
+
+    ml_train:
+      name: corportal-ml-train
+      max_concurrent_runs: 1
+      schedule:
+        quartz_cron_expression: ${var.train_schedule}
+        timezone_id: UTC
+        pause_status: ${var.train_schedule_status}
+      job_clusters:
+        - job_cluster_key: single_node
+          new_cluster:
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type_id}
+            num_workers: 0
+            data_security_mode: SINGLE_USER
+            spark_conf:
+              spark.master: "local[*, 4]"
+              spark.databricks.cluster.profile: singleNode
+              spark.sql.session.timeZone: UTC
+            custom_tags:
+              ResourceClass: SingleNode
+            spark_env_vars:
+              CATALOG: ${var.catalog}
+              BRONZE_SOURCE: kafka
+              EVENTHUB_NAMESPACE: ${var.eventhub_namespace}
+              EVENTHUB_NAME: ${var.eventhub_name}
+              EVENTHUB_SERVICE_CREDENTIAL: ${var.eventhub_service_credential}
+              CHECKPOINT_VOLUME: checkpoints
+              SQL_SERVER: ${var.sql_server}
+              SQL_DATABASE: ${var.sql_database}
+              SQL_SERVICE_CREDENTIAL: ${var.sql_service_credential}
+              BATCH_CADENCE_SECONDS: ${var.batch_cadence_seconds}
+              AS_OF: ${var.as_of}
+      tasks:
+        - task_key: train
+          job_cluster_key: single_node
+          python_wheel_task:
+            package_name: corp_pipelines
+            entry_point: corp-pipelines
+            parameters: ["train", "--run-id", "{{job.run_id}}", "--started-at", "{{job.start_time.iso_datetime}}"]
+          libraries:
+            - whl: ./dist/*.whl
+
+targets:
+  dev:
+    default: true
+    mode: development
+  prod:
+    mode: production
+    workspace:
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}

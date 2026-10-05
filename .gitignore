@@ -1,0 +1,14 @@
+.work/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.claude/settings.local.json
+.venv/
+.env
+__pycache__/
+*.pyc
+
+# Scrooge's token ledger (Org Kit)
+docs/costing/token_usage/
+.DS_Store

@@ -1,0 +1,38 @@
+# Local medallion runner: Python + OpenJDK + PySpark + delta-spark, the SQL Server ODBC
+# driver for the serving write, and scikit-learn + pandas + MLflow for the ML tasks (train,
+# score). Versions match Databricks Runtime 15.4 LTS closely (MLflow 2.x, numpy 1.x). Build from the repo root:
+#   docker build -f databricks/Dockerfile.local -t corportal/pipelines:local .
+# Bookworm: Spark 3.5 (= Databricks Runtime 15.4 LTS) supports Java 17, which trixie dropped.
+FROM python:3.12-slim-bookworm
+
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates openjdk-17-jre-headless procps \
+ && . /etc/os-release \
+ && curl -fsSL -o /tmp/packages-microsoft-prod.deb "https://packages.microsoft.com/config/debian/${VERSION_ID}/packages-microsoft-prod.deb" \
+ && dpkg -i /tmp/packages-microsoft-prod.deb && rm /tmp/packages-microsoft-prod.deb \
+ && apt-get update \
+ && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 unixodbc \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+    "pyspark==3.5.5" "delta-spark==3.3.2" "sqlalchemy>=2.0,<3" "pyodbc>=5.1" \
+    "numpy>=1.26,<2" "pandas>=2.2,<2.3" "scikit-learn>=1.5,<1.6" "mlflow-skinny>=2.22,<3"
+
+RUN useradd --uid 10001 --create-home --home-dir /home/pipelines pipelines \
+ && mkdir -p /lake/landing /lake/delta /lake/mlruns && chown -R 10001:10001 /lake
+USER 10001
+ENV HOME=/home/pipelines \
+    PYTHONPATH=/opt/pipelines/src \
+    PYTHONUNBUFFERED=1 \
+    LAKE_DIR=/lake/delta \
+    LANDING_DIR=/lake/landing \
+    MLFLOW_TRACKING_URI=file:///lake/mlruns \
+    BRONZE_SOURCE=files \
+    BATCH_CADENCE_SECONDS=300
+
+COPY databricks/src /opt/pipelines/src
+# Fetch the Delta jars into the Ivy cache now, so containers start offline.
+RUN python -c "from corp_pipelines.lake import local_spark; local_spark().stop()"
+
+CMD ["python", "-m", "corp_pipelines.run_local"]

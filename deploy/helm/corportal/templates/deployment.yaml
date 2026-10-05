@@ -1,0 +1,123 @@
+{{- range $name, $svc := .Values.services }}
+{{- if $svc.enabled }}
+{{- $ctx := dict "root" $ "name" $name }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "corportal.labels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ $svc.replicas | default 1 }}
+  # Replace in place: a surge copy needs room the small (quota-capped) nodes don't have.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 0, maxUnavailable: 1}
+  selector:
+    matchLabels:
+      {{- include "corportal.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "corportal.labels" $ctx | nindent 8 }}
+        # Istio sidecar injection (managed add-on; mTLS STRICT, stack.md)
+        sidecar.istio.io/inject: "true"
+        {{- with $.Values.istio.revision }}
+        istio.io/rev: {{ . }}
+        {{- end }}
+        {{- if $svc.workloadIdentityClientId }}
+        azure.workload.identity/use: "true"
+        {{- end }}
+      annotations:
+        {{- if $svc.vault }}
+        # Vault Agent injector (P-3): secrets never live in the image, the chart or the repo.
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/agent-pre-populate: "true"
+        vault.hashicorp.com/auth-path: {{ $.Values.vault.authPath | quote }}
+        vault.hashicorp.com/role: {{ $name | quote }}
+        vault.hashicorp.com/agent-inject-secret-env: {{ printf "%s/%s" $.Values.vault.secretPathPrefix $name | quote }}
+        vault.hashicorp.com/agent-inject-template-env: |
+          {{- include "corportal.vaultTemplate" $ctx | nindent 10 }}
+        # The Vault Agent init container runs before the Istio sidecar is up, so its calls to
+        # Vault (8200) must bypass the mesh redirect.
+        traffic.sidecar.istio.io/excludeOutboundPorts: "8200"
+        {{- end }}
+    spec:
+      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: {{ if $svc.workloadIdentityClientId }}true{{ else }}{{ $svc.vault | default false }}{{ end }}
+      {{- with $.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if $.Values.global.spot }}
+      nodeSelector:
+        karpenter.sh/capacity-type: spot
+      tolerations:
+        - key: kubernetes.azure.com/scalesetpriority
+          operator: Equal
+          value: spot
+          effect: NoSchedule
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          image: {{ include "corportal.image" $ctx }}
+          imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+          {{- if and $svc.vault $svc.command }}
+          command: ["/bin/sh", "-c", {{ printf ". /vault/secrets/env && exec %s" (join " " $svc.command) | quote }}]
+          {{- else if $svc.command }}
+          command: {{ toJson $svc.command }}
+          {{- end }}
+          env:
+            - name: REGION
+              value: {{ $.Values.global.region | quote }}
+            {{- if eq (toString $svc.entra) "api" }}
+            - name: ENTRA_TENANT_ID
+              value: {{ $.Values.global.entra.tenantId | quote }}
+            - name: ENTRA_AUDIENCE
+              value: {{ $.Values.global.entra.audience | quote }}
+            {{- with $.Values.global.entra.issuer }}
+            - name: ENTRA_ISSUER
+              value: {{ . | quote }}
+            {{- end }}
+            {{- else if eq (toString $svc.entra) "spa" }}
+            - name: VITE_ENTRA_CLIENT_ID
+              value: {{ $.Values.global.entra.spaClientId | quote }}
+            - name: VITE_ENTRA_AUTHORITY
+              value: {{ $.Values.global.entra.authority | quote }}
+            - name: VITE_ENTRA_KNOWN_AUTHORITY
+              value: {{ $.Values.global.entra.knownAuthority | quote }}
+            - name: VITE_ENTRA_API_SCOPE
+              value: {{ $.Values.global.entra.apiScope | quote }}
+            {{- end }}
+            {{- if eq $name "outbox-relay" }}
+            - name: EVENTHUB_NAMESPACE
+              value: {{ $.Values.global.eventHubsNamespace | quote }}
+            {{- end }}
+            {{- range $k, $v := $svc.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          {{- if $svc.port }}
+          ports:
+            - name: http
+              containerPort: {{ $svc.port }}
+          {{- end }}
+          {{- if $svc.probePath }}
+          readinessProbe:
+            httpGet: {path: {{ $svc.probePath }}, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: {{ $svc.probePath }}, port: http}
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            failureThreshold: 3
+          {{- end }}
+          {{- with $svc.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml $svc.resources | nindent 12 }}
+{{- end }}
+{{- end }}

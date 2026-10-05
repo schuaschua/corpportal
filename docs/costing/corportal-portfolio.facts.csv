@@ -1,0 +1,30 @@
+estimate,currency,period,year,category,item,amount
+corportal-portfolio,USD,Build,0,delivery team,Delivery team,270000.0
+corportal-portfolio,USD,Build,0,one-off,Other one-off costs,25500
+corportal-portfolio,USD,Build,0,environment,Dev environment (during delivery),691.32
+corportal-portfolio,USD,Build,0,environment,Test environment (during delivery),973.84
+corportal-portfolio,USD,Build,0,environment,UAT environment (during delivery),1962.21
+corportal-portfolio,USD,Build,0,environment,Prod environment (during delivery),3628.97
+corportal-portfolio,USD,Build,0,claude,Claude API usage,382.8
+corportal-portfolio,USD,Build,0,contingency,Contingency,30313.91
+corportal-portfolio,USD,Year 1,1,environment,Dev environment (run),2322.84
+corportal-portfolio,USD,Year 1,1,environment,Test environment (run),3272.09
+corportal-portfolio,USD,Year 1,1,environment,UAT environment (run),11773.28
+corportal-portfolio,USD,Year 1,1,environment,Prod environment (run),43547.61
+corportal-portfolio,USD,Year 1,1,support,Run support (OPEX),88000.0
+corportal-portfolio,USD,Year 1,1,run costs,Recurring run costs,15000.0
+corportal-portfolio,USD,Year 1,1,contingency,Contingency,16391.58
+corportal-portfolio,USD,Year 2,2,environment,Dev environment (run),2392.53
+corportal-portfolio,USD,Year 2,2,environment,Test environment (run),3370.25
+corportal-portfolio,USD,Year 2,2,environment,UAT environment (run),12126.48
+corportal-portfolio,USD,Year 2,2,environment,Prod environment (run),44854.04
+corportal-portfolio,USD,Year 2,2,support,Run support (OPEX),90640.0
+corportal-portfolio,USD,Year 2,2,run costs,Recurring run costs,15450.0
+corportal-portfolio,USD,Year 2,2,contingency,Contingency,16883.33
+corportal-portfolio,USD,Year 3,3,environment,Dev environment (run),2464.3
+corportal-portfolio,USD,Year 3,3,environment,Test environment (run),3471.36
+corportal-portfolio,USD,Year 3,3,environment,UAT environment (run),12490.27
+corportal-portfolio,USD,Year 3,3,environment,Prod environment (run),46199.66
+corportal-portfolio,USD,Year 3,3,support,Run support (OPEX),93359.2
+corportal-portfolio,USD,Year 3,3,run costs,Recurring run costs,15913.5
+corportal-portfolio,USD,Year 3,3,contingency,Contingency,17389.83

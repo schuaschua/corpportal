@@ -1,0 +1,112 @@
+day,kind,work_item,story_no,title,model,calls,input_tokens,cache_write_5m_tokens,cache_write_1h_tokens,cache_read_tokens,output_tokens,cost_units,cost_usd
+2026-07-27,planning,brainstorming,,,claude-opus-5-5,99,771,359180,41815,15766876,93187,2575999,7.1506
+2026-07-28,planning,brainstorming,,,claude-opus-5-5,150,565,428398,53737,20612077,125636,3332924,9.2093
+2026-07-29,planning,spec,,,claude-opus-5-5,108,510,353290,43525,15311490,92576,2523202,7.0305
+2026-07-30,planning,spec,,,claude-opus-5-5,76,522,259983,28964,11561605,59776,1838469,5.0416
+2026-07-31,planning,spec,,,claude-opus-5-5,95,695,313874,34331,15562561,84339,2439651,6.6461
+2026-08-03,planning,spec,,,claude-opus-5-5,106,696,351426,41815,15867028,94194,2581281,7.1517
+2026-08-04,planning,spec,,,claude-opus-5-5,120,926,352737,50938,18060586,97531,2837437,7.7376
+2026-08-05,planning,architecture,,,claude-opus-5-5,103,675,305086,34837,13942212,88296,2287408,6.3612
+2026-08-06,planning,architecture,,,claude-opus-5-5,81,483,265660,27709,12282734,77030,2001399,5.5491
+2026-08-07,planning,architecture,,,claude-opus-5-5,69,466,282036,30613,12564245,64279,1992056,5.4554
+2026-08-10,planning,architecture,,,claude-opus-5-5,132,781,388193,44724,18611848,102347,2948390,8.0712
+2026-08-10,planning,UX design,,,claude-opus-5-5,100,753,329945,34242,14554576,85704,2365646,6.5517
+2026-08-11,planning,architecture,,,claude-opus-5-5,148,763,465725,54305,21437905,131667,3493655,9.6870
+2026-08-11,planning,UX design,,,claude-opus-5-5,94,589,327222,37832,15081315,101513,2500977,6.9876
+2026-08-12,planning,architecture,,,claude-opus-5-5,82,522,239706,25588,11946283,65724,1874579,5.1091
+2026-08-12,planning,UX design,,,claude-opus-5-5,100,575,371283,39616,16730844,97800,2705995,7.4778
+2026-08-13,planning,architecture,,,claude-opus-5-5,132,722,443926,46639,20244016,109109,3218854,8.8266
+2026-08-13,planning,UX design,,,claude-opus-5-5,76,464,255766,27771,12252024,66866,1935246,5.2906
+2026-08-14,planning,architecture,,,claude-opus-5-5,171,979,520527,62653,25132917,149477,4037620,11.1239
+2026-08-14,planning,UX design,,,claude-opus-5-5,61,404,196576,21882,9281760,57623,1506179,4.1684
+2026-08-17,planning,UX design,,,claude-opus-5-5,94,559,327532,34843,15582577,93915,2507493,6.9135
+2026-08-17,planning,governance (Jules),,,claude-opus-5-5,46,251,157598,18000,7109442,44660,1167493,3.2481
+2026-08-18,planning,UX design,,,claude-opus-5-5,70,372,235608,28551,11137035,66616,1798768,4.9677
+2026-08-18,planning,governance (Jules),,,claude-opus-5-5,46,301,166780,17832,8229155,49835,1316530,3.6203
+2026-08-18,planning,architecture docs (Da Vinci),,,claude-opus-5-5,81,562,262081,27177,12295498,70536,1964747,5.3999
+2026-08-19,planning,UX design,,,claude-opus-5-5,115,470,330666,40708,15363802,95045,2506824,6.9545
+2026-08-19,planning,governance (Jules),,,claude-opus-5-5,78,390,222864,26681,11598949,64642,1815437,4.9420
+2026-08-19,planning,architecture docs (Da Vinci),,,claude-opus-5-5,60,321,226490,23132,9747865,59328,1601124,4.4549
+2026-08-20,planning,governance (Jules),,,claude-opus-5-5,106,560,297386,26906,13927722,76758,2202667,6.0251
+2026-08-20,planning,architecture docs (Da Vinci),,,claude-opus-5-5,84,606,317527,35945,13770749,70015,2196555,6.0321
+2026-08-21,planning,governance (Jules),,,claude-opus-5-5,97,419,251652,27593,12039647,77584,1962055,5.4403
+2026-08-21,planning,architecture docs (Da Vinci),,,claude-opus-5-5,44,250,125295,14398,6108395,43922,1016114,2.8428
+2026-08-24,planning,architecture docs (Da Vinci),,,claude-opus-5-5,100,565,315117,36459,14730425,93789,2409367,6.6914
+2026-08-24,planning,epics & stories,,,claude-opus-5-5,120,745,419296,52593,19827151,113428,3179906,8.7542
+2026-08-25,planning,epics & stories,,,claude-opus-5-5,164,1183,509645,54562,23821402,157684,3917923,10.9074
+2026-08-25,story,PORTAL-111,2.5,Payment creation with maker-checker approval and execution,claude-opus-5-5,20,90,57544,6553,2710803,14873,430571,1.1801
+2026-08-25,story,PORTAL-114,3.2,Outbox relay from the SQL ledger to Event Hubs,claude-opus-5-5,10,72,31119,3700,1374125,8714,227353,0.6346
+2026-08-25,story,PORTAL-117,3.5,Behind-the-scenes stage panel,claude-opus-5-5,16,118,47657,5900,2104710,10964,336780,0.9262
+2026-08-25,story,PORTAL-119,4.2,Cash forecast model tracked in MLflow and registered in Unity Catalog,claude-opus-5-5,9,62,30854,3083,1403160,8503,227626,0.6299
+2026-08-25,story,PORTAL-121,4.4,Batch scoring into forecasts and anomalies tables,claude-opus-5-5,18,69,48045,6264,2478204,17017,405559,1.1266
+2026-08-25,story,PORTAL-123,5.1,Region-2 AKS from the same Terraform module,claude-opus-5-5,14,110,47293,6727,2257245,16564,381225,1.0735
+2026-08-25,story,PORTAL-124,5.2,"Front Door origins, health probes and Front Door-only ingress",claude-opus-5-5,13,51,36120,4785,1590908,11049,269107,0.7582
+2026-08-25,story,PORTAL-126,5.4,Grafana requests-per-second by region,claude-opus-5-5,13,75,48527,5417,2117224,12626,346420,0.9622
+2026-08-25,story,PORTAL-127,5.5,Regional failover drill and runbook,claude-opus-5-5,14,134,48954,5608,2442046,14448,388987,1.0675
+2026-08-25,story,PORTAL-128,6.1,Security controls evidence pack for the CISO review,claude-opus-5-5,15,117,54291,6229,2641089,13996,414528,1.1299
+2026-08-25,story,PORTAL-131,6.4,"CAB approval, production cut-over and hypercare",claude-opus-5-5,15,95,43160,4790,2214174,16918,369632,1.0357
+2026-08-26,planning,epics & stories,,,claude-opus-5-5,182,849,546788,64133,25647872,130488,4029827,10.9897
+2026-08-26,story,PORTAL-115,3.3,Bronze ingestion from the Event Hubs Kafka endpoint,claude-opus-5-5,16,106,46803,5534,2271940,15080,372272,1.0347
+2026-08-26,story,PORTAL-116,3.4,Silver and gold Delta transforms with serving-schema write-back,claude-opus-5-5,13,109,48679,5933,2293063,10145,352855,0.9528
+2026-08-26,story,PORTAL-120,4.3,Isolation Forest payment anomaly detection,claude-opus-5-5,19,94,57618,6622,2712777,14386,428568,1.1717
+2026-08-26,story,PORTAL-129,6.2,PDPA data-protection assessment and penetration test remediation,claude-opus-5-5,16,48,46669,4208,2028847,13387,336620,0.9407
+2026-08-26,story,PORTAL-130,6.3,UAT with Group Treasury and business sign-off,claude-opus-5-5,14,87,45760,5179,2082456,8342,317601,0.8539
+2026-08-27,planning,epics & stories,,,claude-opus-5-5,123,871,360823,43843,17811235,108032,2860869,7.8812
+2026-08-27,story,PORTAL-112,2.6,"Portal chrome: region badge, synthetic-data banner and error states",claude-opus-5-5,16,79,51347,4158,2238077,14180,367286,1.0215
+2026-08-27,story,PORTAL-113,3.1,"Seeded synthetic world: companies, payroll cycles, suppliers and planted anomalies",claude-opus-5-5,19,109,58655,5445,2606398,16111,425513,1.1808
+2026-08-27,story,PORTAL-118,4.1,Unity Catalog lineage from gold back to the Event Hubs source,claude-opus-5-5,11,86,41416,4593,1938969,10805,308964,0.8481
+2026-08-27,story,PORTAL-122,4.5,Forecast screen and anomaly flags in the portal,claude-opus-5-5,11,62,34832,3620,1689013,10153,270508,0.7442
+2026-08-27,story,PORTAL-125,5.3,SQL failover group behind a Terraform flag,claude-opus-5-5,15,79,51280,5066,2473649,12558,384466,1.0431
+2026-08-31,story,PORTAL-101,1.1,Terraform resource groups and least-privilege Jenkins identity,claude-opus-5-5,52,331,157862,18054,7801120,50356,1265658,3.5024
+2026-09-01,ops,"merges, promotions & deploys",,,claude-opus-5-5,15,80,47584,5005,2013751,12114,331515,0.9233
+2026-09-01,story,PORTAL-101,1.1,Terraform resource groups and least-privilege Jenkins identity,claude-opus-5-5,75,458,252798,26459,11271879,66804,1830581,5.0679
+2026-09-02,ops,"merges, promotions & deploys",,,claude-opus-5-5,11,55,42880,4882,1990420,13169,328306,0.9151
+2026-09-02,story,PORTAL-101,1.1,Terraform resource groups and least-privilege Jenkins identity,claude-opus-5-5,39,229,125457,13143,5596394,33558,910766,2.5238
+2026-09-02,story,PORTAL-102,1.2,"AKS with Node Auto Provisioning, Istio mTLS STRICT and Kong ingress",claude-opus-5-5,75,466,232137,25565,10964653,59443,1735448,4.7489
+2026-09-03,ops,"merges, promotions & deploys",,,claude-opus-5-5,11,66,35748,5243,1738363,9185,274998,0.7523
+2026-09-03,story,PORTAL-102,1.2,"AKS with Node Auto Provisioning, Istio mTLS STRICT and Kong ingress",claude-opus-5-5,38,237,126654,13192,5697410,34467,927014,2.5686
+2026-09-04,ops,"merges, promotions & deploys",,,claude-opus-5-5,10,66,32926,3476,1655761,10556,266532,0.7350
+2026-09-04,story,PORTAL-102,1.2,"AKS with Node Auto Provisioning, Istio mTLS STRICT and Kong ingress",claude-opus-5-5,71,437,226465,22539,10192270,61767,1656658,4.5882
+2026-09-07,ops,"merges, promotions & deploys",,,claude-opus-5-5,14,72,41883,4807,2113125,12112,333912,0.9130
+2026-09-07,story,PORTAL-102,1.2,"AKS with Node Auto Provisioning, Istio mTLS STRICT and Kong ingress",claude-opus-5-5,55,328,191155,21991,8414887,55135,1400417,3.9187
+2026-09-07,story,PORTAL-103,1.3,Vault with Key Vault auto-unseal and secret-free services,claude-opus-5-5,39,241,114637,13263,5196583,28914,834292,2.2978
+2026-09-08,ops,"merges, promotions & deploys",,,claude-opus-5-5,11,48,32764,3855,1476670,8166,237210,0.6535
+2026-09-08,story,PORTAL-103,1.3,Vault with Key Vault auto-unseal and secret-free services,claude-opus-5-5,61,443,222188,25765,9679099,56700,1581118,4.3887
+2026-09-09,ops,"merges, promotions & deploys",,,claude-opus-5-5,10,57,34357,4090,1546984,10219,256977,0.7185
+2026-09-09,story,PORTAL-103,1.3,Vault with Key Vault auto-unseal and secret-free services,claude-opus-5-5,67,271,202704,22565,9316496,58397,1522416,4.2264
+2026-09-09,story,PORTAL-104,1.4,Parallel microservice image builds with Kaniko on Jenkins agents,claude-opus-5-5,44,169,113526,12988,5839754,32858,916318,2.4973
+2026-09-10,ops,"merges, promotions & deploys",,,claude-opus-5-5,10,65,27564,3196,1340571,7171,210824,0.5752
+2026-09-10,story,PORTAL-104,1.4,Parallel microservice image builds with Kaniko on Jenkins agents,claude-opus-5-5,31,235,102870,11693,4648758,26584,750004,2.0703
+2026-09-11,ops,"merges, promotions & deploys",,,claude-opus-5-5,6,34,19277,3032,1076327,6388,169767,0.4638
+2026-09-11,story,PORTAL-104,1.4,Parallel microservice image builds with Kaniko on Jenkins agents,claude-opus-5-5,64,303,194183,24258,9027955,54536,1467023,4.0625
+2026-09-11,story,PORTAL-105,1.5,"Private endpoints and private DNS for lake, SQL, Key Vault and Event Hubs",claude-opus-5-5,49,305,174986,21590,7586807,44178,1241788,3.4498
+2026-09-14,ops,"merges, promotions & deploys",,,claude-opus-5-5,15,78,43878,3982,1897432,12561,315438,0.8823
+2026-09-14,story,PORTAL-105,1.5,"Private endpoints and private DNS for lake, SQL, Key Vault and Event Hubs",claude-opus-5-5,33,176,91822,10313,4543714,24366,711781,1.9384
+2026-09-15,ops,"merges, promotions & deploys",,,claude-opus-5-5,11,47,34092,3576,1594796,9097,254779,0.7002
+2026-09-15,story,PORTAL-105,1.5,"Private endpoints and private DNS for lake, SQL, Key Vault and Event Hubs",claude-opus-5-5,58,326,173804,18832,8595759,56718,1398411,3.8745
+2026-09-15,story,PORTAL-106,1.6,Cost guardrails: Databricks cluster policy and clean terraform destroy,claude-opus-5-5,37,260,107895,11877,4948217,29551,801459,2.2162
+2026-09-16,ops,"merges, promotions & deploys",,,claude-opus-5-5,5,33,16927,2219,769659,4631,125751,0.3491
+2026-09-16,story,PORTAL-106,1.6,Cost guardrails: Databricks cluster policy and clean terraform destroy,claude-opus-5-5,45,222,120302,13976,6091433,33766,956525,2.6078
+2026-09-17,ops,"merges, promotions & deploys",,,claude-opus-5-5,14,107,44874,5273,1938427,10050,310838,0.8557
+2026-09-17,story,PORTAL-107,2.1,Entra External ID sign-in and company-scoped sessions,claude-opus-5-5,44,312,128971,14932,6288681,40508,1022798,2.8335
+2026-09-18,ops,"merges, promotions & deploys",,,claude-opus-5-5,7,43,23296,2988,1042987,5174,165308,0.4526
+2026-09-18,story,PORTAL-107,2.1,Entra External ID sign-in and company-scoped sessions,claude-opus-5-5,69,481,211417,25722,10560405,62698,1685727,4.6308
+2026-09-21,ops,"merges, promotions & deploys",,,claude-opus-5-5,9,45,31007,3778,1461821,8079,232937,0.6394
+2026-09-21,story,PORTAL-107,2.1,Entra External ID sign-in and company-scoped sessions,claude-opus-5-5,77,485,243384,30101,12062791,66635,1904371,5.2049
+2026-09-21,story,PORTAL-108,2.2,Row-level security for company isolation with blocked-access logging,claude-opus-5-5,44,304,135137,15932,6496977,38883,1045202,2.8814
+2026-09-22,ops,"merges, promotions & deploys",,,claude-opus-5-5,14,111,41047,5481,1997444,9986,312056,0.8487
+2026-09-22,story,PORTAL-108,2.2,Row-level security for company isolation with blocked-access logging,claude-opus-5-5,36,210,104405,12395,4780417,30800,787548,2.1941
+2026-09-23,ops,"merges, promotions & deploys",,,claude-opus-5-5,9,65,32499,3303,1472429,8022,234648,0.6441
+2026-09-23,story,PORTAL-108,2.2,Row-level security for company isolation with blocked-access logging,claude-opus-5-5,53,278,144969,15749,6603437,41995,1083306,3.0125
+2026-09-24,ops,"merges, promotions & deploys",,,claude-opus-5-5,9,66,31602,3911,1544452,10963,256651,0.7177
+2026-09-24,story,PORTAL-108,2.2,Row-level security for company isolation with blocked-access logging,claude-opus-5-5,45,297,144081,16395,6667936,45700,1108482,3.1003
+2026-09-24,story,PORTAL-109,2.3,Cash position and liquidity dashboard from the serving schema,claude-opus-5-5,58,257,173624,16130,8384494,50071,1338351,3.6765
+2026-09-25,ops,"merges, promotions & deploys",,,claude-opus-5-5,10,68,32174,3343,1531137,7254,236355,0.6392
+2026-09-25,story,PORTAL-109,2.3,Cash position and liquidity dashboard from the serving schema,claude-opus-5-5,53,379,167224,19525,7911773,49126,1285266,3.5587
+2026-09-28,ops,"merges, promotions & deploys",,,claude-opus-5-5,9,30,31328,3021,1385585,7209,219836,0.6022
+2026-09-28,story,PORTAL-109,2.3,Cash position and liquidity dashboard from the serving schema,claude-opus-5-5,37,282,123020,13397,5851398,36902,950501,2.6317
+2026-09-28,story,PORTAL-110,2.4,"Accounts, balances and transactions",claude-opus-5-5,29,186,101378,10934,4819365,26083,761128,2.0806
+2026-09-29,ops,"merges, promotions & deploys",,,claude-opus-5-5,13,72,42645,4544,1774515,11029,295063,0.8253
+2026-09-29,story,PORTAL-110,2.4,"Accounts, balances and transactions",claude-opus-5-5,30,137,100434,11537,4767173,27348,762211,2.0954
+2026-09-30,ops,"merges, promotions & deploys",,,claude-opus-5-5,9,64,29110,3215,1270343,7615,207991,0.5779
+2026-09-30,story,PORTAL-110,2.4,"Accounts, balances and transactions",claude-opus-5-5,31,176,88977,11904,4446821,26254,711157,1.9553

@@ -1,0 +1,15 @@
+{{- /* dev: one Let's Encrypt certificate for Kong's DNS name, shared by every Ingress. */ -}}
+{{- if .Values.ingress.tls.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: corportal
+  labels:
+    app.kubernetes.io/part-of: corportal
+spec:
+  secretName: {{ .Values.ingress.tls.secretName }}
+  dnsNames: [{{ .Values.ingress.host | quote }}]
+  issuerRef:
+    kind: ClusterIssuer
+    name: {{ .Values.ingress.tls.clusterIssuer }}
+{{- end }}

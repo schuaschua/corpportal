@@ -1,0 +1,38 @@
+{{- if .Values.global.spot }}
+# Spot capacity for the services during development (stack.md). Node auto-provisioning's own
+# `default` NodePool is on-demand only. DEMO_MODE (global.spot=false) removes this pool, so
+# Karpenter drains the spot nodes and the pods land on regular nodes.
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: {{ printf "%s-spot" .Release.Name }}
+  labels:
+    app.kubernetes.io/part-of: corportal
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  limits:
+    cpu: {{ .Values.karpenter.spotCpuLimit | quote }}
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 1m
+  template:
+    spec:
+      nodeClassRef:
+        group: karpenter.azure.com
+        kind: AKSNodeClass
+        name: {{ .Values.karpenter.nodeClass }}
+      taints:
+        - key: kubernetes.azure.com/scalesetpriority
+          value: spot
+          effect: NoSchedule
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot"]
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: karpenter.azure.com/sku-family
+          operator: In
+          values: ["D"]
+{{- end }}

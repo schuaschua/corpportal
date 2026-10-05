@@ -1,0 +1,43 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<!-- corportal multibranch job (ci/jenkins/create-jobs.sh fills __NAME__, __DESCRIPTION__, __SCRIPT__).
+     Plain Git branch source (no GitHub Branch Source plugin): branches main, develop, feature/*;
+     scanned every 5 minutes. main -> prod, develop -> dev, feature/* -> build and checks only. -->
+<org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject>
+  <description>__DESCRIPTION__</description>
+  <orphanedItemStrategy class="com.cloudbees.hudson.plugins.folder.computed.DefaultOrphanedItemStrategy">
+    <pruneDeadBranches>true</pruneDeadBranches>
+    <daysToKeep>-1</daysToKeep>
+    <numToKeep>-1</numToKeep>
+    <abortBuilds>false</abortBuilds>
+  </orphanedItemStrategy>
+  <triggers>
+    <com.cloudbees.hudson.plugins.folder.computed.PeriodicFolderTrigger>
+      <spec>H/5 * * * *</spec>
+      <interval>300000</interval>
+    </com.cloudbees.hudson.plugins.folder.computed.PeriodicFolderTrigger>
+  </triggers>
+  <sources class="jenkins.branch.MultiBranchProject$BranchSourceList">
+    <data>
+      <jenkins.branch.BranchSource>
+        <source class="jenkins.plugins.git.GitSCMSource">
+          <id>corportal-__NAME__</id>
+          <remote>https://github.com/schuaschua/corpportal.git</remote>
+          <credentialsId>github-corpportal</credentialsId>
+          <traits>
+            <jenkins.plugins.git.traits.BranchDiscoveryTrait/>
+            <jenkins.scm.impl.trait.WildcardSCMHeadFilterTrait>
+              <includes>main develop feature/*</includes>
+              <excludes></excludes>
+            </jenkins.scm.impl.trait.WildcardSCMHeadFilterTrait>
+          </traits>
+        </source>
+        <strategy class="jenkins.branch.DefaultBranchPropertyStrategy">
+          <properties class="empty-list"/>
+        </strategy>
+      </jenkins.branch.BranchSource>
+    </data>
+  </sources>
+  <factory class="org.jenkinsci.plugins.workflow.multibranch.WorkflowBranchProjectFactory">
+    <scriptPath>__SCRIPT__</scriptPath>
+  </factory>
+</org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject>
